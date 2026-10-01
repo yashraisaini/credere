@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/*
+ * Credere design tokens
+ * Black page, bottle-green money, engraved lines. The guilloche banknote on
+ * the home screen is the one loud element; everything else stays quiet.
+ */
+@theme {
+  --color-ink: #000000;      /* page */
+  --color-vault: #07120d;    /* raised surfaces: inputs, sheets */
+  --color-note: #0b2a1f;     /* banknote paper */
+  --color-bottle: #0f3d2e;   /* primary actions */
+  --color-bottle-hi: #155039;
+  --color-engrave: #3f7a61;  /* lines, guilloche, focus */
+  --color-rule: #18271f;     /* hairlines on black */
+  --color-sage: #b5d2c0;     /* you're owed */
+  --color-rose: #d9a193;     /* you owe */
+  --color-bone: #ecebe4;     /* primary text */
+  --color-mist: #86938b;     /* secondary text */
+
+  --font-display: "Bodoni Moda Variable", "Bodoni 72", Didot, Georgia, serif;
+  --font-sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    background: var(--color-ink);
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--color-ink);
+    color: var(--color-bone);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--color-bottle-hi);
+    color: var(--color-bone);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-engrave);
+    outline-offset: 2px;
+  }
+  input,
+  select,
+  button {
+    font: inherit;
+  }
+}
+
+.select-caret {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2386938b' stroke-width='1.5'%3E%3Cpath d='M2 4.5 6 8.5 10 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+  background-size: 12px;
+  padding-right: 2.25rem;
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* The guilloche engraves itself once on load */
+.guilloche path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: engrave 2.6s cubic-bezier(0.22, 0.7, 0.2, 1) forwards;
+}
+@keyframes engrave {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Receipt being read */
+.reading-line {
+  animation: read 1.6s ease-in-out infinite alternate;
+}
+@keyframes read {
+  from { transform: translateY(0); }
+  to { transform: translateY(var(--travel, 120px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guilloche path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .reading-line {
+    animation: none;
+  }
+}

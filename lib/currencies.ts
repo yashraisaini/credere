@@ -1,0 +1,41 @@
+/** Currencies offered in pickers. Rates for all of these resolve via /api/rates. */
+export const CURRENCIES: { code: string; name: string }[] = [
+  { code: "CAD", name: "Canadian dollar" },
+  { code: "USD", name: "US dollar" },
+  { code: "EUR", name: "Euro" },
+  { code: "GBP", name: "British pound" },
+  { code: "MXN", name: "Mexican peso" },
+  { code: "JPY", name: "Japanese yen" },
+  { code: "KRW", name: "South Korean won" },
+  { code: "CNY", name: "Chinese yuan" },
+  { code: "HKD", name: "Hong Kong dollar" },
+  { code: "SGD", name: "Singapore dollar" },
+  { code: "THB", name: "Thai baht" },
+  { code: "VND", name: "Vietnamese dong" },
+  { code: "IDR", name: "Indonesian rupiah" },
+  { code: "PHP", name: "Philippine peso" },
+  { code: "MYR", name: "Malaysian ringgit" },
+  { code: "INR", name: "Indian rupee" },
+  { code: "AED", name: "UAE dirham" },
+  { code: "TRY", name: "Turkish lira" },
+  { code: "CHF", name: "Swiss franc" },
+  { code: "SEK", name: "Swedish krona" },
+  { code: "NOK", name: "Norwegian krone" },
+  { code: "DKK", name: "Danish krone" },
+  { code: "ISK", name: "Icelandic króna" },
+  { code: "PLN", name: "Polish złoty" },
+  { code: "CZK", name: "Czech koruna" },
+  { code: "HUF", name: "Hungarian forint" },
+  { code: "AUD", name: "Australian dollar" },
+  { code: "NZD", name: "New Zealand dollar" },
+  { code: "BRL", name: "Brazilian real" },
+  { code: "COP", name: "Colombian peso" },
+  { code: "PEN", name: "Peruvian sol" },
+  { code: "ZAR", name: "South African rand" },
+  { code: "MAD", name: "Moroccan dirham" },
+  { code: "EGP", name: "Egyptian pound" },
+];
+
+export function currencyName(code: string) {
+  return CURRENCIES.find((c) => c.code === code)?.name ?? code;
+}
