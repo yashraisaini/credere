@@ -4,11 +4,13 @@ import Link from "next/link";
 import { Settings2 } from "lucide-react";
 import { useMemo } from "react";
 import { BalanceNote } from "@/components/BalanceNote";
+import { useRipple } from "@/components/Ripple";
 import { AvatarStack, Money, Page, SectionTitle } from "@/components/ui";
 import { groupBalances } from "@/lib/balances";
 import { convertMinor } from "@/lib/money";
 import { useRates } from "@/lib/rates";
 import { displayName, useCredere } from "@/lib/store";
+import type { Group } from "@/lib/types";
 
 export default function Home() {
   const { groups, expenses, settlements, profile } = useCredere();
@@ -89,32 +91,42 @@ export default function Home() {
         ) : (
           <ul className="mt-3">
             {yours.map(({ group, balance }) => (
-              <li key={group.id}>
-                <Link
-                  href={`/groups/${group.id}`}
-                  className="flex items-center gap-4 border-b border-rule py-5 transition-colors hover:border-engrave/50"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[1.0625rem] text-bone">{group.name}</p>
-                    <div className="mt-2 flex items-center gap-3">
-                      <AvatarStack names={group.members.map((m) => displayName(group, m.id))} size={24} />
-                      <span className="text-sm text-mist">
-                        {group.members.length} people, in {group.baseCurrency}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <Money minor={balance} currency={group.baseCurrency} signed tone="balance" />
-                    <p className="text-xs text-mist">
-                      {balance > 0 ? "owed to you" : balance < 0 ? "you owe" : "settled"}
-                    </p>
-                  </div>
-                </Link>
-              </li>
+              <GroupRow key={group.id} group={group} balance={balance} />
             ))}
           </ul>
         )}
       </section>
     </Page>
+  );
+}
+
+/** One group in the list, with the green bloom under a press. */
+function GroupRow({ group, balance }: { group: Group; balance: number }) {
+  const { onPointerDown, layer } = useRipple<HTMLAnchorElement>();
+  return (
+    <li>
+      <Link
+        href={`/groups/${group.id}`}
+        onPointerDown={onPointerDown}
+        className="relative flex items-center gap-4 overflow-hidden border-b border-rule py-5 transition-colors hover:border-engrave/50"
+      >
+        {layer}
+        <div className="relative min-w-0 flex-1">
+          <p className="truncate text-[1.0625rem] text-bone">{group.name}</p>
+          <div className="mt-2 flex items-center gap-3">
+            <AvatarStack names={group.members.map((m) => displayName(group, m.id))} size={24} />
+            <span className="text-sm text-mist">
+              {group.members.length} people, in {group.baseCurrency}
+            </span>
+          </div>
+        </div>
+        <div className="relative text-right">
+          <Money minor={balance} currency={group.baseCurrency} signed tone="balance" />
+          <p className="text-xs text-mist">
+            {balance > 0 ? "owed to you" : balance < 0 ? "you owe" : "settled"}
+          </p>
+        </div>
+      </Link>
+    </li>
   );
 }

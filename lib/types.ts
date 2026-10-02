@@ -19,6 +19,8 @@ export interface Member {
   name: string;
   /** Card the member usually pays with. Drives foreign transaction fees. */
   cardPlanId: string;
+  /** Optional, for nudging them in Messages. Stays on this device. */
+  phone?: string;
 }
 
 export type FeePolicy = "split" | "payer";

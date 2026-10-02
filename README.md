@@ -24,6 +24,10 @@ local IP on the same Wi-Fi, or deploy to Vercel (add the env var in project sett
 | Split engine: equal, exact, percent, shares, by item (tax and tip spread proportionally) | `lib/split.ts` |
 | Card fees per person (foreign fee %, flat fee), shared or covered by the payer | `lib/fees.ts` |
 | Balances and settle-up suggestions | `lib/balances.ts` |
+| Activity across every group, reached by tapping the card | `app/activity/page.tsx`, `lib/activity.ts` |
+| Reminders into iMessage, the share sheet or the clipboard | `lib/remind.ts`, `components/Remind.tsx` |
+| Card chip and contactless mark on the balance note | `components/Chip.tsx` |
+| Green bloom under a press, guilloche drifting behind every screen | `components/Ripple.tsx`, `components/AppShell.tsx` |
 | Local-first store with demo data | `lib/store.ts` |
 
 ### How the money math works
@@ -36,9 +40,18 @@ local IP on the same Wi-Fi, or deploy to Vercel (add the env var in project sett
 - Card fee = converted amount x the payer's foreign fee % + flat fee, only when the purchase
   currency differs from the group currency.
 
+### Reminders
+
+There's no server to send from, so a reminder is handed to whatever the phone
+already has. A member with a phone number saved (People tab) gets an `sms:` link,
+which opens iMessage on iOS with the text filled in; without one, the Web Share
+sheet covers WhatsApp, Signal and the rest, and desktop falls back to the
+clipboard. Phone numbers stay in localStorage on your device.
+
 ## Screens
 
 - `/` balance across all groups and the group list
+- `/activity` every expense and settlement that moved your balance, in your home currency
 - `/groups/new` create a group, add people and their cards
 - `/groups/[id]` expenses, balances with settle up, people and card fee policy
 - `/groups/[id]/add` add or scan an expense
@@ -53,4 +66,6 @@ local IP on the same Wi-Fi, or deploy to Vercel (add the env var in project sett
 4. **Network rate spread.** Visa and Mastercard rates differ slightly from the ECB mid-market rate;
    add a spread field to `CardPlan` if you want to model it.
 5. **Offline rates.** Cache the last known rate per currency so adding expenses works with no data abroad.
-6. **PWA.** Add a manifest and service worker so it installs to the home screen.
+6. **PWA and push.** Add a manifest and service worker so it installs to the home screen,
+   and so Credere can push a reminder to your own phone on a schedule. Today's reminders
+   are outbound only: you tap, the phone's messaging app opens.

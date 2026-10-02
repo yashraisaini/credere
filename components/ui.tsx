@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { forwardRef } from "react";
+import { useRipple } from "./Ripple";
 import { formatMoney } from "@/lib/money";
 
 export function cx(...classes: (string | false | null | undefined)[]) {
@@ -40,14 +41,19 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "primary", block, className, ...props },
+  { variant = "primary", block, className, children, onPointerDown, ...props },
   ref,
 ) {
+  const ripple = useRipple<HTMLButtonElement>();
   return (
     <button
       ref={ref}
+      onPointerDown={(e) => {
+        if (!props.disabled) ripple.onPointerDown(e);
+        onPointerDown?.(e);
+      }}
       className={cx(
-        "inline-flex h-12 items-center justify-center gap-2 rounded-full px-6 text-[0.9375rem] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+        "relative inline-flex h-12 items-center justify-center gap-2 overflow-hidden rounded-full px-6 text-[0.9375rem] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
         variant === "primary" &&
           "bg-bottle text-bone shadow-[inset_0_0_0_1px_rgb(63_122_97/0.55)] hover:bg-bottle-hi",
         variant === "quiet" && "bg-transparent text-bone shadow-[inset_0_0_0_1px_var(--color-rule)] hover:shadow-[inset_0_0_0_1px_var(--color-engrave)]",
@@ -56,7 +62,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         className,
       )}
       {...props}
-    />
+    >
+      {variant !== "ghost" && ripple.layer}
+      <span className="relative inline-flex items-center gap-2">{children}</span>
+    </button>
   );
 });
 

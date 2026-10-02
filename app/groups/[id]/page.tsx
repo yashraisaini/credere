@@ -12,11 +12,14 @@ import {
   Money,
   Page,
   Segmented,
+  inputBase,
   inputClass,
   selectBase,
   cx,
 } from "@/components/ui";
+import { RemindButton } from "@/components/Remind";
 import { groupBalances, simplifyDebts } from "@/lib/balances";
+import { groupSummaryText, reminderText } from "@/lib/remind";
 import { PRESET_PLANS, describePlan, findPlan } from "@/lib/fees";
 import { formatMoney } from "@/lib/money";
 import { setPendingReceipt } from "@/lib/pending-receipt";
@@ -300,31 +303,59 @@ function Balances({ group, balances }: { group: Group; balances: Record<string, 
           <>
             <p className="mt-1 text-sm text-mist">Pay these and everyone is square.</p>
             <ul className="mt-3">
-              {transfers.map((t) => (
-                <li
-                  key={`${t.from}-${t.to}`}
-                  className="flex items-center gap-4 border-b border-rule py-4"
-                >
-                  <p className="flex-1 text-bone">{describeTransfer(group, t.from, t.to)}</p>
-                  <Money minor={t.amount} currency={base} className="text-bone" />
-                  <Button
-                    variant="quiet"
-                    className="h-9 px-4 text-sm"
-                    onClick={() =>
-                      addSettlement({
-                        groupId: group.id,
-                        from: t.from,
-                        to: t.to,
-                        amount: t.amount,
-                        date: new Date().toISOString().slice(0, 10),
-                      })
-                    }
-                  >
-                    Mark paid
-                  </Button>
-                </li>
-              ))}
+              {transfers.map((t) => {
+                const owesMe = t.to === "me";
+                const debtor = group.members.find((m) => m.id === t.from);
+                return (
+                  <li key={`${t.from}-${t.to}`} className="border-b border-rule py-4">
+                    <div className="flex items-center gap-4">
+                      <p className="flex-1 text-bone">{describeTransfer(group, t.from, t.to)}</p>
+                      <Money minor={t.amount} currency={base} className="text-bone" />
+                    </div>
+                    <div className="mt-3 flex items-start justify-end gap-2">
+                      {owesMe && debtor && (
+                        <RemindButton
+                          phone={debtor.phone}
+                          text={reminderText({
+                            name: debtor.name,
+                            amount: t.amount,
+                            currency: base,
+                            groupName: group.name,
+                          })}
+                        />
+                      )}
+                      <Button
+                        variant="quiet"
+                        className="h-9 px-4 text-sm"
+                        onClick={() =>
+                          addSettlement({
+                            groupId: group.id,
+                            from: t.from,
+                            to: t.to,
+                            amount: t.amount,
+                            date: new Date().toISOString().slice(0, 10),
+                          })
+                        }
+                      >
+                        Mark paid
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
+
+            <div className="mt-6">
+              <RemindButton
+                block
+                label="Message the group"
+                text={groupSummaryText(group, balances)}
+              />
+              <p className="mt-2 text-xs text-mist">
+                Opens Messages with the rundown. Add a phone number under People to text someone
+                directly.
+              </p>
+            </div>
           </>
         )}
       </section>
@@ -345,27 +376,46 @@ function People({ group }: { group: Group }) {
         {group.members.map((m) => {
           const plan = findPlan(m.cardPlanId, customPlans);
           return (
-            <li key={m.id} className="flex items-center gap-4 border-b border-rule py-4">
-              <Avatar name={displayName(group, m.id)} />
-              <div className="min-w-0 flex-1">
-                <p className="text-bone">{displayName(group, m.id)}</p>
-                <p className="text-xs text-mist">{describePlan(plan)}</p>
+            <li key={m.id} className="border-b border-rule py-4">
+              <div className="flex items-center gap-4">
+                <Avatar name={displayName(group, m.id)} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-bone">{displayName(group, m.id)}</p>
+                  <p className="text-xs text-mist">{describePlan(plan)}</p>
+                </div>
+                <label className="sr-only" htmlFor={`plan-${m.id}`}>
+                  Card for {displayName(group, m.id)}
+                </label>
+                <select
+                  id={`plan-${m.id}`}
+                  value={m.cardPlanId}
+                  onChange={(e) => updateMember(group.id, m.id, { cardPlanId: e.target.value })}
+                  className={cx(selectBase, "h-10 w-[12rem] shrink-0 text-sm")}
+                >
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <label className="sr-only" htmlFor={`plan-${m.id}`}>
-                Card for {displayName(group, m.id)}
-              </label>
-              <select
-                id={`plan-${m.id}`}
-                value={m.cardPlanId}
-                onChange={(e) => updateMember(group.id, m.id, { cardPlanId: e.target.value })}
-                className={cx(selectBase, "h-10 w-[12rem] shrink-0 text-sm")}
-              >
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+              {m.id !== "me" && (
+                <div className="mt-3 flex items-center gap-3 pl-[3.25rem]">
+                  <label className="sr-only" htmlFor={`phone-${m.id}`}>
+                    Phone number for {m.name}
+                  </label>
+                  <input
+                    id={`phone-${m.id}`}
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="off"
+                    value={m.phone ?? ""}
+                    onChange={(e) => updateMember(group.id, m.id, { phone: e.target.value })}
+                    placeholder="Phone, to text a reminder"
+                    className={cx(inputBase, "h-10 w-full text-sm")}
+                  />
+                </div>
+              )}
             </li>
           );
         })}
