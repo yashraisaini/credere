@@ -4,10 +4,12 @@ import Link from "next/link";
 import { Settings2 } from "lucide-react";
 import { useMemo } from "react";
 import { BalanceNote } from "@/components/BalanceNote";
+import { GroupCover } from "@/components/GroupCover";
 import { useRipple } from "@/components/Ripple";
 import { AvatarStack, Money, Page, SectionTitle } from "@/components/ui";
 import { groupBalances } from "@/lib/balances";
 import { convertMinor } from "@/lib/money";
+import { useGroupPhoto } from "@/lib/photo";
 import { useRates } from "@/lib/rates";
 import { displayName, useCredere } from "@/lib/store";
 import type { Group } from "@/lib/types";
@@ -89,9 +91,9 @@ export default function Home() {
             </Link>
           </div>
         ) : (
-          <ul className="mt-3">
+          <ul className="mt-4 space-y-4">
             {yours.map(({ group, balance }) => (
-              <GroupRow key={group.id} group={group} balance={balance} />
+              <GroupCard key={group.id} group={group} balance={balance} />
             ))}
           </ul>
         )}
@@ -100,31 +102,48 @@ export default function Home() {
   );
 }
 
-/** One group in the list, with the green bloom under a press. */
-function GroupRow({ group, balance }: { group: Group; balance: number }) {
+/** One group as a photo card, with the green bloom under a press. */
+function GroupCard({ group, balance }: { group: Group; balance: number }) {
   const { onPointerDown, layer } = useRipple<HTMLAnchorElement>();
+  const photo = useGroupPhoto(group);
+
   return (
     <li>
       <Link
         href={`/groups/${group.id}`}
         onPointerDown={onPointerDown}
-        className="relative flex items-center gap-4 overflow-hidden border-b border-rule py-5 transition-colors hover:border-engrave/50"
+        className="relative block aspect-[16/10] overflow-hidden rounded-2xl shadow-[inset_0_0_0_1px_var(--color-rule)] transition-shadow hover:shadow-[inset_0_0_0_1px_var(--color-engrave)]"
       >
+        <GroupCover photo={photo} width={440} />
+
+        {/* Scrim: keeps the name readable whatever the photo underneath does. */}
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-linear-to-t from-ink from-10% via-ink/78 via-45% to-ink/25"
+        />
+
         {layer}
-        <div className="relative min-w-0 flex-1">
-          <p className="truncate text-[1.0625rem] text-bone">{group.name}</p>
-          <div className="mt-2 flex items-center gap-3">
-            <AvatarStack names={group.members.map((m) => displayName(group, m.id))} size={24} />
-            <span className="text-sm text-mist">
-              {group.members.length} people, in {group.baseCurrency}
-            </span>
+
+        <div className="relative flex size-full flex-col justify-end p-5">
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h3 className="line-clamp-2 font-display text-[1.6875rem] leading-[1.12] text-bone">
+                {group.name}
+              </h3>
+              <div className="mt-2 flex items-center gap-3">
+                <AvatarStack names={group.members.map((m) => displayName(group, m.id))} size={24} />
+                <span className="text-sm text-bone/70">
+                  {group.members.length} people, in {group.baseCurrency}
+                </span>
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              <Money minor={balance} currency={group.baseCurrency} signed tone="balance" />
+              <p className="text-xs text-bone/60">
+                {balance > 0 ? "owed to you" : balance < 0 ? "you owe" : "settled"}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="relative text-right">
-          <Money minor={balance} currency={group.baseCurrency} signed tone="balance" />
-          <p className="text-xs text-mist">
-            {balance > 0 ? "owed to you" : balance < 0 ? "you owe" : "settled"}
-          </p>
         </div>
       </Link>
     </li>

@@ -11,6 +11,7 @@ import type {
   Expense,
   FeePolicy,
   Group,
+  GroupPhoto,
   Member,
   Profile,
   Settlement,
@@ -40,6 +41,8 @@ interface CredereState {
   addMember: (groupId: string, member: { name: string; cardPlanId: string }) => void;
   updateMember: (groupId: string, memberId: string, patch: Partial<Omit<Member, "id">>) => void;
   setFeePolicy: (groupId: string, policy: FeePolicy) => void;
+  /** Cover photo. Pass null to clear it and fall back to the guilloche. */
+  setGroupPhoto: (groupId: string, photo: GroupPhoto | null) => void;
 
   addExpense: (expense: Omit<Expense, "id" | "createdAt">) => string;
   deleteExpense: (id: string) => void;
@@ -93,6 +96,11 @@ export const useCredere = create<CredereState>()(
       setFeePolicy: (groupId, policy) =>
         set((s) => ({
           groups: s.groups.map((g) => (g.id === groupId ? { ...g, feePolicy: policy } : g)),
+        })),
+
+      setGroupPhoto: (groupId, photo) =>
+        set((s) => ({
+          groups: s.groups.map((g) => (g.id === groupId ? { ...g, photo } : g)),
         })),
 
       addExpense: (expense) => {

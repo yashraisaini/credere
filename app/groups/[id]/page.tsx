@@ -15,14 +15,17 @@ import {
   inputBase,
   inputClass,
   selectBase,
+  Notice,
   cx,
 } from "@/components/ui";
 import { RemindButton } from "@/components/Remind";
+import { GroupCover, PhotoCredit } from "@/components/GroupCover";
 import { groupBalances, simplifyDebts } from "@/lib/balances";
 import { groupSummaryText, reminderText } from "@/lib/remind";
 import { PRESET_PLANS, describePlan, findPlan } from "@/lib/fees";
 import { formatMoney } from "@/lib/money";
 import { setPendingReceipt } from "@/lib/pending-receipt";
+import { fetchPhoto, photoQuery, useGroupPhoto } from "@/lib/photo";
 import { useRate } from "@/lib/rates";
 import { displayName, useCredere } from "@/lib/store";
 import type { Expense, Group } from "@/lib/types";
@@ -37,6 +40,7 @@ export default function GroupPage() {
   const settlements = useCredere((s) => s.settlements);
   const [tab, setTab] = useState<Tab>("expenses");
   const fileRef = useRef<HTMLInputElement>(null);
+  const photo = useGroupPhoto(group);
 
   const expenses = useMemo(
     () =>
@@ -69,10 +73,20 @@ export default function GroupPage() {
     <Page>
       <BackLink href="/">All groups</BackLink>
 
-      <header className="mt-5">
-        <h1 className="font-display text-[2.5rem] font-normal leading-[1.05] tracking-[-0.015em]">
-          {group.name}
-        </h1>
+      <header className="mt-4">
+        {/* Full bleed: the photo runs past the page gutter to the screen edges. */}
+        <div className="relative -mx-5 aspect-[16/9] overflow-hidden">
+          <GroupCover photo={photo} width={480} />
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-linear-to-t from-ink from-8% via-ink/60 via-60% to-ink/15"
+          />
+          <div className="relative flex size-full items-end px-5 pb-4">
+            <h1 className="font-display text-[2.5rem] font-normal leading-[1.05] tracking-[-0.015em]">
+              {group.name}
+            </h1>
+          </div>
+        </div>
         <p className="mt-3 text-mist">{who}</p>
         {lastForeign && <LiveRate from={lastForeign} to={group.baseCurrency} />}
       </header>
@@ -445,6 +459,8 @@ function People({ group }: { group: Group }) {
         </Button>
       </form>
 
+      <GroupPhotoSettings group={group} />
+
       <section className="space-y-3">
         <h3 className="font-display text-[1.5rem]">Card fees</h3>
         <p className="text-sm text-mist">
@@ -461,6 +477,66 @@ function People({ group }: { group: Group }) {
         />
       </section>
     </div>
+  );
+}
+
+/** Swap the cover photo for the next match, or drop back to the guilloche. */
+function GroupPhotoSettings({ group }: { group: Group }) {
+  const setGroupPhoto = useCredere((s) => s.setGroupPhoto);
+  const photo = useGroupPhoto(group);
+  const [busy, setBusy] = useState(false);
+  const [skip, setSkip] = useState(0);
+  const [missed, setMissed] = useState(false);
+
+  async function find(next: number) {
+    setBusy(true);
+    setMissed(false);
+    const found = await fetchPhoto(photoQuery(group.name), next);
+    if (found) {
+      setGroupPhoto(group.id, found);
+      setSkip(next);
+    } else {
+      setMissed(true);
+    }
+    setBusy(false);
+  }
+
+  return (
+    <section className="space-y-3">
+      <h3 className="font-display text-[1.5rem]">Cover photo</h3>
+
+      {photo ? (
+        <>
+          <p className="text-sm text-mist">Found on Unsplash for &ldquo;{photo.query}&rdquo;.</p>
+          <PhotoCredit photo={photo} />
+          <div className="flex gap-3">
+            <Button type="button" variant="quiet" onClick={() => find(skip + 1)} disabled={busy}>
+              {busy ? "Looking…" : "Try another"}
+            </Button>
+            <Button type="button" variant="quiet" onClick={() => setGroupPhoto(group.id, null)}>
+              Remove
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-mist">
+            This group shows the engraved rosette. Photos are searched on Unsplash by the
+            group&apos;s name.
+          </p>
+          {missed && (
+            <Notice>
+              Nothing came back for &ldquo;{photoQuery(group.name)}&rdquo;. Check that
+              UNSPLASH_ACCESS_KEY is set in .env.local, or rename the group to something more
+              searchable.
+            </Notice>
+          )}
+          <Button type="button" variant="quiet" onClick={() => find(0)} disabled={busy}>
+            {busy ? "Looking…" : "Find a photo"}
+          </Button>
+        </>
+      )}
+    </section>
   );
 }
 

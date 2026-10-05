@@ -10,6 +10,10 @@ TypeScript, Tailwind v4, Zustand (localStorage for now), Anthropic SDK.
 - All state changes go through actions in `lib/store.ts`. Components don't mutate data directly.
 - Expenses lock `fx.rate`, `fee`, and `shares` at save time. Don't recompute history from live rates.
 - The Anthropic key is server-only. Vision calls happen in `app/api/receipt/route.ts`, never the client.
+- The Unsplash key is server-only too. Group cover photos are searched in `app/api/photo/route.ts`.
+  Store the URL, never a copy of the image: their terms want photos hotlinked, and base64 in
+  localStorage would blow the quota. Always render `PhotoCredit` where a photo is shown, since
+  crediting the photographer with a link back is a condition of their API.
 - Run `npm run typecheck` after changes.
 
 ## Design
@@ -17,8 +21,11 @@ TypeScript, Tailwind v4, Zustand (localStorage for now), Anthropic SDK.
 - Tokens live in `app/globals.css` under `@theme`: ink (true black page), vault (raised surfaces),
   bottle (primary green), engrave (lines, focus), sage (owed to you), rose (you owe), bone (text), mist (secondary).
 - Bodoni Moda for display text and big numbers, Hanken Grotesk for UI. Use the `num` utility for amounts.
-- The guilloche banknote on the home screen is the one decorative element. Keep everything else quiet:
-  hairline rows on black, no card grids, no all-caps labels, sentence case copy.
+- Groups carry an Unsplash cover photo, shown as a photo card on the home screen and a full-bleed
+  header on the group page. A group with no photo falls back to the guilloche, so both states are
+  designed, not one broken. Everything else stays quiet: hairline rows on black, no all-caps
+  labels, sentence case copy.
+- Text over a photo always sits on a scrim (`bg-linear-to-t from-ink`), never straight on the image.
 - Phone first. Main actions sit in `ActionBar` at the bottom.
 
 <!-- BEGIN:nextjs-agent-rules -->

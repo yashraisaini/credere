@@ -7,11 +7,13 @@ and see what everyone owes with live exchange rates and real card fees included.
 
 ```bash
 npm install
-cp .env.example .env.local   # add your ANTHROPIC_API_KEY for receipt scanning
+cp .env.example .env.local   # add your keys (see below)
 npm run dev                  # http://localhost:3000
 ```
 
-Live rates work without a key. Receipt scanning needs `ANTHROPIC_API_KEY`.
+Live rates work without a key. Receipt scanning needs `ANTHROPIC_API_KEY`. Group cover photos
+need `UNSPLASH_ACCESS_KEY` (free, from [unsplash.com/developers](https://unsplash.com/developers));
+without it every group falls back to the engraved guilloche.
 To try it on your phone, run `npm run dev -- -H 0.0.0.0` and open your laptop's
 local IP on the same Wi-Fi, or deploy to Vercel (add the env var in project settings).
 

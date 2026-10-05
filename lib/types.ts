@@ -25,6 +25,25 @@ export interface Member {
 
 export type FeePolicy = "split" | "payer";
 
+/**
+ * Cover photo for a group. We store the Unsplash URL rather than a copy of the
+ * image: their API terms ask that photos stay hotlinked, and it keeps
+ * localStorage small (a base64 photo would blow the quota in a few groups).
+ */
+export interface GroupPhoto {
+  /** Unsplash photo id. */
+  id: string;
+  /** Hotlinked image URL, sized by the `w` param at render time. */
+  url: string;
+  /** Unsplash's dominant colour, painted under the image so cards never flash black. */
+  color: string;
+  alt: string;
+  /** Unsplash requires crediting the photographer with a link back to them. */
+  credit: { name: string; link: string };
+  /** The term that found it, so we don't re-search for a name that hasn't changed. */
+  query: string;
+}
+
 export interface Group {
   id: string;
   name: string;
@@ -33,6 +52,8 @@ export interface Group {
   members: Member[];
   /** Whether card fees get shared by the people in the expense, or absorbed by whoever paid. */
   feePolicy: FeePolicy;
+  /** Cover photo. Undefined means we haven't looked yet; null means the user cleared it. */
+  photo?: GroupPhoto | null;
   createdAt: string;
 }
 
