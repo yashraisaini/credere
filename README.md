@@ -1,5 +1,5 @@
 # Credere
-
+Yash x Yash fun build
 Split costs with friends in any currency. Scan a receipt, assign items to people,
 and see what everyone owes with live exchange rates and real card fees included.
 
