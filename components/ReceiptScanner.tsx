@@ -3,18 +3,26 @@
 import { Camera, CircleAlert, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { prepareReceipt } from "@/lib/image";
+import { canReadOffline, scanWithOcr } from "@/lib/ocr";
 import type { ScannedReceipt } from "@/lib/types";
 import { Button } from "./ui";
 
+/** Which engine read the receipt, so the UI can be honest about it. */
+type Source = "model" | "offline";
+
 type State =
   | { status: "idle" }
-  | { status: "reading"; preview: string | null }
-  | { status: "done"; preview: string | null; itemCount: number }
+  | { status: "reading"; preview: string | null; offline: boolean; progress?: number }
+  | { status: "done"; preview: string | null; itemCount: number; source: Source; unsure: boolean }
   | { status: "error"; message: string };
 
 /**
- * Takes a photo (camera on phones), shrinks it, sends it to /api/receipt and
- * hands back structured line items.
+ * Takes a photo (camera on phones), shrinks it, and reads it.
+ *
+ * The vision model goes first, because it is far better at creased paper and
+ * odd layouts. When it is unavailable - no key, rate limited, offline - it
+ * falls back to OCR in the browser rather than failing, so scanning always
+ * does something. The fallback is weaker, and the UI says so.
  */
 export function ReceiptScanner({
   hintCurrency,
@@ -30,10 +38,17 @@ export function ReceiptScanner({
   const started = useRef(false);
 
   async function scan(file: File) {
+    let prepared;
     try {
-      const prepared = await prepareReceipt(file);
-      setState({ status: "reading", preview: prepared.previewUrl });
+      prepared = await prepareReceipt(file);
+    } catch (e) {
+      setState({ status: "error", message: message(e) });
+      return;
+    }
 
+    setState({ status: "reading", preview: prepared.previewUrl, offline: false });
+
+    try {
       const res = await fetch("/api/receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -48,9 +63,40 @@ export function ReceiptScanner({
 
       const receipt = body as ScannedReceipt;
       onScanned(receipt);
-      setState({ status: "done", preview: prepared.previewUrl, itemCount: receipt.items.length });
+      setState({
+        status: "done",
+        preview: prepared.previewUrl,
+        itemCount: receipt.items.length,
+        source: "model",
+        unsure: false,
+      });
+      return;
+    } catch (modelError) {
+      // Tesseract reads pixels, so there is nothing it can do with a PDF.
+      if (!prepared.previewUrl || !canReadOffline(prepared.mediaType)) {
+        setState({ status: "error", message: message(modelError) });
+        return;
+      }
+    }
+
+    setState({ status: "reading", preview: prepared.previewUrl, offline: true });
+    try {
+      const receipt = await scanWithOcr(prepared.previewUrl!, hintCurrency, (progress) =>
+        setState({ status: "reading", preview: prepared.previewUrl, offline: true, progress }),
+      );
+      if (receipt.total <= 0) {
+        throw new Error("Couldn't find a total on that receipt.");
+      }
+      onScanned(receipt);
+      setState({
+        status: "done",
+        preview: prepared.previewUrl,
+        itemCount: receipt.items.length,
+        source: "offline",
+        unsure: receipt.totalConfidence !== "labelled",
+      });
     } catch (e) {
-      setState({ status: "error", message: e instanceof Error ? e.message : "Couldn't read that receipt." });
+      setState({ status: "error", message: message(e) });
     }
   }
 
@@ -101,14 +147,26 @@ export function ReceiptScanner({
           {state.status === "reading" ? (
             <>
               <p className="text-bone">Reading the receipt</p>
-              <p className="text-sm text-mist">Finding items, tax and tip</p>
+              <p className="text-sm text-mist">
+                {!state.offline
+                  ? "Finding items, tax and tip"
+                  : state.progress === undefined
+                    ? "Reading it on your phone"
+                    : `Reading it on your phone, ${Math.round(state.progress * 100)}%`}
+              </p>
             </>
           ) : (
             <>
               <p className="text-bone">
                 Found {state.itemCount} {state.itemCount === 1 ? "item" : "items"}
               </p>
-              <p className="text-sm text-mist">Tap people under each item to assign it.</p>
+              <p className="text-sm text-mist">
+                {state.source === "offline"
+                  ? state.unsure
+                    ? "Read on your phone, and the total is a guess. Check it."
+                    : "Read on your phone, so check the amounts."
+                  : "Tap people under each item to assign it."}
+              </p>
             </>
           )}
         </div>
@@ -146,4 +204,8 @@ export function ReceiptScanner({
       {picker}
     </div>
   );
+}
+
+function message(e: unknown): string {
+  return e instanceof Error ? e.message : "Couldn't read that receipt.";
 }

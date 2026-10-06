@@ -11,9 +11,10 @@ cp .env.example .env.local   # add your keys (see below)
 npm run dev                  # http://localhost:3000
 ```
 
-Live rates work without a key. Receipt scanning needs `GEMINI_API_KEY` (free, from
-[aistudio.google.com/apikey](https://aistudio.google.com/apikey)); it reads any photo the browser
-can open, iPhone HEIC, and PDF receipts. Group cover photos
+Live rates work without a key. Receipt scanning works without one too: with `GEMINI_API_KEY` set
+(free, from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)) it uses Gemini, and
+without it falls back to OCR in your browser. It reads any photo the browser can open and iPhone
+HEIC; PDF receipts need the model, since OCR reads pixels. Group cover photos
 need `UNSPLASH_ACCESS_KEY` (free, from [unsplash.com/developers](https://unsplash.com/developers));
 without it every group falls back to the engraved guilloche.
 To try it on your phone, run `npm run dev -- -H 0.0.0.0` and open your laptop's

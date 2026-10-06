@@ -11,6 +11,10 @@ TypeScript, Tailwind v4, Zustand (localStorage for now).
 - Expenses lock `fx.rate`, `fee`, and `shares` at save time. Don't recompute history from live rates.
 - The Gemini key is server-only. Receipt vision happens in `app/api/receipt/route.ts`, never the
   client. It is called over plain REST, on the free tier, so expect 429s under heavy use.
+- Scanning falls back to OCR in the browser (`lib/ocr.ts`) whenever the model is unavailable, so it
+  always does something. `lib/receipt-text.ts` is the parser and is a pure function of the text,
+  so test it directly rather than through a browser. The fallback is weaker, and the UI says so
+  rather than presenting its figures as equal.
 - The Unsplash key is server-only too. Group cover photos are searched in `app/api/photo/route.ts`.
   Store the URL, never a copy of the image: their terms want photos hotlinked, and base64 in
   localStorage would blow the quota. Always render `PhotoCredit` where a photo is shown, since
