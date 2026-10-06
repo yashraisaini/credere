@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ActionSheet } from "@/components/ActionSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { BackLink, Money, Page } from "@/components/ui";
+import { BackLink, Money, Page, cx } from "@/components/ui";
 import { buildActivity, byMonth, dayLabel } from "@/lib/activity";
 import { convertMinor, formatMoney } from "@/lib/money";
 import { useRates } from "@/lib/rates";
@@ -228,10 +228,31 @@ function Row({
       ? entry.expense.description
       : settlementTitle(entry);
 
-  const detail =
+  // Who actually put the money down, which the group name alone never said.
+  const payer = entry.kind === "expense" ? displayName(entry.group, entry.expense.paidBy) : null;
+  const detail = [
+    payer ? `${payer} paid` : null,
+    entry.group.name,
     entry.kind === "expense" && entry.expense.original.currency !== base
-      ? `${entry.group.name} · ${formatMoney(entry.expense.original.amount, entry.expense.original.currency)}`
-      : entry.group.name;
+      ? formatMoney(entry.expense.original.amount, entry.expense.original.currency)
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  /**
+   * Name the person on the side of the ledger that costs you something. Colour
+   * already says the direction, but colour alone is not a thing to rely on
+   * when the difference is being owed money or owing it.
+   */
+  const standing =
+    entry.kind === "settlement"
+      ? "settled"
+      : entry.delta > 0
+        ? "owed to you"
+        : entry.delta < 0
+          ? `you owe ${payer}`
+          : "no effect";
 
   return (
     <li>
@@ -252,14 +273,13 @@ function Row({
           ) : (
             <Money minor={inHome} currency={home} signed tone="balance" />
           )}
-          <p className="text-xs text-mist">
-            {entry.kind === "settlement"
-              ? "settled"
-              : entry.delta > 0
-                ? "you paid"
-                : entry.delta < 0
-                  ? "your share"
-                  : "no effect"}
+          <p
+            className={cx(
+              "truncate text-xs",
+              entry.delta > 0 ? "text-sage/80" : entry.delta < 0 ? "text-rose/80" : "text-mist",
+            )}
+          >
+            {standing}
           </p>
         </div>
       </button>
