@@ -1,16 +1,21 @@
 /**
  * Getting whatever the user picked into something the vision API can read.
  *
- * Two paths. A PDF goes up untouched, because Claude reads PDFs natively and
- * rasterising one here would only lose text. Everything else is decoded by the
- * browser and re-encoded as a modest JPEG, which means we accept any format
- * the browser can open (PNG, WebP, AVIF, GIF, BMP, HEIC on Safari) without the
- * server needing to know about any of them.
+ * Three paths. A PDF goes up untouched, because the model reads PDFs natively
+ * and rasterising one here would only lose text. A HEIC the browser refuses to
+ * open also goes up untouched, since the model reads HEIC even where Chrome
+ * cannot. Everything else is decoded by the browser and re-encoded as a modest
+ * JPEG, which means we accept any format the browser can open (PNG, WebP,
+ * AVIF, GIF, BMP) without the server needing to know about any of them.
  */
 
-export type PreparedReceipt =
-  | { kind: "image"; base64: string; mediaType: "image/jpeg"; previewUrl: string }
-  | { kind: "pdf"; base64: string; mediaType: "application/pdf"; previewUrl: null };
+export type PreparedReceipt = {
+  kind: "image" | "pdf";
+  base64: string;
+  mediaType: string;
+  /** Null when there is nothing the browser could render as a thumbnail. */
+  previewUrl: string | null;
+};
 
 /** The API caps a request at 32MB; stay well under it. */
 const MAX_PDF_BYTES = 12 * 1024 * 1024;
@@ -27,7 +32,19 @@ export async function prepareReceipt(
     return { kind: "pdf", base64: await fileToBase64(file), mediaType: "application/pdf", previewUrl: null };
   }
 
-  const decoded = await decode(file);
+  let decoded: Decoded;
+  try {
+    decoded = await decode(file);
+  } catch (e) {
+    // The model reads HEIC even where this browser can't, so rather than
+    // refusing an iPhone photo outright, send the original bytes up.
+    const heic = heicType(file);
+    if (heic) {
+      return { kind: "image", base64: await fileToBase64(file), mediaType: heic, previewUrl: null };
+    }
+    throw e;
+  }
+
   try {
     const scale = Math.min(1, maxDim / Math.max(decoded.width, decoded.height));
     const width = Math.max(1, Math.round(decoded.width * scale));
@@ -104,11 +121,17 @@ async function decode(file: File): Promise<Decoded> {
   }
 }
 
+/** The media type to send for a HEIC/HEIF file, or null if it isn't one. */
+function heicType(file: File): string | null {
+  if (/heic/i.test(file.type)) return "image/heic";
+  if (/heif/i.test(file.type)) return "image/heif";
+  if (/\.heic$/i.test(file.name)) return "image/heic";
+  if (/\.heif$/i.test(file.name)) return "image/heif";
+  return null;
+}
+
 function unreadable(file: File): string {
-  // HEIC is the common one: iPhones shoot it, and only Safari decodes it.
-  if (/\.(heic|heif)$/i.test(file.name) || /heic|heif/i.test(file.type)) {
-    return "This browser can't open HEIC photos. Open it in Safari, or save the photo as JPEG first.";
-  }
+  if (heicType(file)) return "Couldn't open that photo.";
   return "That file isn't an image this browser can open. Try a JPEG, PNG or PDF.";
 }
 

@@ -1,7 +1,7 @@
 # Credere: notes for Claude Code
 
 Splitwise-style app for travel: live FX, receipt scanning, card fees. Next.js App Router,
-TypeScript, Tailwind v4, Zustand (localStorage for now), Anthropic SDK.
+TypeScript, Tailwind v4, Zustand (localStorage for now).
 
 ## Rules
 
@@ -9,7 +9,8 @@ TypeScript, Tailwind v4, Zustand (localStorage for now), Anthropic SDK.
 - Use `allocate()` from `lib/split.ts` whenever a total is divided, so cents always reconcile.
 - All state changes go through actions in `lib/store.ts`. Components don't mutate data directly.
 - Expenses lock `fx.rate`, `fee`, and `shares` at save time. Don't recompute history from live rates.
-- The Anthropic key is server-only. Vision calls happen in `app/api/receipt/route.ts`, never the client.
+- The Gemini key is server-only. Receipt vision happens in `app/api/receipt/route.ts`, never the
+  client. It is called over plain REST, on the free tier, so expect 429s under heavy use.
 - The Unsplash key is server-only too. Group cover photos are searched in `app/api/photo/route.ts`.
   Store the URL, never a copy of the image: their terms want photos hotlinked, and base64 in
   localStorage would blow the quota. Always render `PhotoCredit` where a photo is shown, since
