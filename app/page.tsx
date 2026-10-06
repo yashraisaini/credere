@@ -6,8 +6,8 @@ import { useMemo } from "react";
 import { BalanceNote } from "@/components/BalanceNote";
 import { GroupCover } from "@/components/GroupCover";
 import { useRipple } from "@/components/Ripple";
-import { AvatarStack, Money, Page, SectionTitle, cx } from "@/components/ui";
-import { groupBalances } from "@/lib/balances";
+import { Avatar, AvatarStack, Money, Page, SectionTitle, cx } from "@/components/ui";
+import { groupBalances, peopleBalances } from "@/lib/balances";
 import { convertMinor } from "@/lib/money";
 import { isUnread } from "@/lib/events";
 import { photoSrc, useGroupPhoto } from "@/lib/photo";
@@ -46,6 +46,17 @@ export default function Home() {
     [groups, home],
   );
   const rates = useRates(pairs);
+
+  const convert = (minor: number, from: string) => {
+    const rate = from === home ? 1 : rates[`${from}:${home}`];
+    return rate === undefined ? undefined : convertMinor(minor, from, home, rate);
+  };
+  const { people, pending: peoplePending } = useMemo(
+    () => peopleBalances(groups, expenses, settlements, convert),
+    // convert closes over `rates`, which is the dependency that matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [groups, expenses, settlements, rates, home],
+  );
 
   let owed = 0;
   let owe = 0;
@@ -97,6 +108,30 @@ export default function Home() {
         groupCount={active.length}
         pending={pending}
       />
+
+      {people.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-sm text-mist">
+            {peoplePending ? "Who owes who, still converting…" : "Who owes who"}
+          </h2>
+          <ul className="mt-2">
+            {people.map((person) => (
+              <li key={person.name}>
+                <div className="flex items-center gap-3 border-b border-rule py-3">
+                  <Avatar name={person.name} size={28} />
+                  <span className="min-w-0 flex-1 truncate text-[0.9375rem] text-bone">
+                    {person.net > 0 ? person.name : `You owe ${person.name}`}
+                  </span>
+                  <div className="shrink-0 text-right">
+                    <Money minor={person.net} currency={home} signed tone="balance" className="text-sm" />
+                    <p className="text-xs text-mist">{person.net > 0 ? "owes you" : "you owe"}</p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="mt-12">
         <SectionTitle

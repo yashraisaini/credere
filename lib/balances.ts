@@ -59,3 +59,61 @@ export function simplifyDebts(balances: Record<string, number>): Transfer[] {
   }
   return transfers;
 }
+
+export interface PersonBalance {
+  /** Matched across groups by name, since members are identified per group. */
+  name: string;
+  /** Positive: they owe you. Negative: you owe them. In the home currency. */
+  net: number;
+}
+
+/**
+ * Who owes who, netted across every group and shown in one currency.
+ *
+ * Per-group balances already exist, but they answer "where does this trip
+ * stand", not "who do I actually owe". Someone can be behind in Lisbon and
+ * ahead on rent; this nets that out so the home screen can name a person and
+ * one number.
+ *
+ * `convert` returns undefined while a rate is still loading. Those groups are
+ * left out and reported as pending rather than counted at the wrong number.
+ */
+export function peopleBalances(
+  groups: Group[],
+  expenses: Expense[],
+  settlements: Settlement[],
+  convert: (minor: number, from: string) => number | undefined,
+): { people: PersonBalance[]; pending: boolean } {
+  const byName = new Map<string, number>();
+  let pending = false;
+
+  for (const group of groups) {
+    if (group.archivedAt) continue;
+
+    // Settling up first means we net against each person, rather than against
+    // the group as a whole, which is the question being asked here.
+    for (const t of simplifyDebts(groupBalances(group, expenses, settlements))) {
+      const youPay = t.from === "me";
+      const theyPay = t.to === "me";
+      if (!youPay && !theyPay) continue;
+
+      const inHome = convert(t.amount, group.baseCurrency);
+      if (inHome === undefined) {
+        pending = true;
+        continue;
+      }
+
+      const otherId = youPay ? t.to : t.from;
+      const name = group.members.find((m) => m.id === otherId)?.name ?? "Someone";
+      byName.set(name, (byName.get(name) ?? 0) + (youPay ? -inHome : inHome));
+    }
+  }
+
+  const people = [...byName.entries()]
+    .map(([name, net]) => ({ name, net }))
+    // Rounding across currencies can leave a stray cent that is not a real debt.
+    .filter((p) => Math.abs(p.net) > 1)
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+
+  return { people, pending };
+}
