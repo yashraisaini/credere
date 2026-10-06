@@ -5,6 +5,7 @@ import { useState } from "react";
 import { BackLink, Button, Field, Page, cx, inputClass, selectClass } from "@/components/ui";
 import { CURRENCIES } from "@/lib/currencies";
 import { PRESET_PLANS, describePlan } from "@/lib/fees";
+import { PAY_METHODS, payLine } from "@/lib/pay";
 import { useCredere } from "@/lib/store";
 
 export default function SettingsPage() {
@@ -54,6 +55,69 @@ export default function SettingsPage() {
             ))}
           </select>
         </Field>
+
+        <section className="space-y-4">
+          <h2 className="font-display text-[1.5rem]">How people pay you back</h2>
+          <p className="text-sm text-mist">
+            Added to the end of every reminder you send, so people know where to send it. It stays
+            on this device and only ever goes out in a message you send yourself.
+          </p>
+
+          <div className="flex gap-3">
+            <div className="w-[11rem] shrink-0">
+              <label className="sr-only" htmlFor="pay-method">
+                Payment method
+              </label>
+              <select
+                id="pay-method"
+                value={profile.payTo?.method ?? "etransfer"}
+                onChange={(e) =>
+                  updateProfile({
+                    payTo: { method: e.target.value as never, handle: profile.payTo?.handle ?? "" },
+                  })
+                }
+                className={selectClass}
+              >
+                {PAY_METHODS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-0 flex-1">
+              <label className="sr-only" htmlFor="pay-handle">
+                Email or phone people send to
+              </label>
+              <input
+                id="pay-handle"
+                type="text"
+                autoComplete="off"
+                value={profile.payTo?.handle ?? ""}
+                onChange={(e) =>
+                  updateProfile({
+                    payTo: {
+                      method: profile.payTo?.method ?? "etransfer",
+                      handle: e.target.value,
+                    },
+                  })
+                }
+                placeholder="Your email or phone"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          {payLine(profile.payTo) ? (
+            <p className="text-sm text-mist">
+              Reminders will end with: &ldquo;{payLine(profile.payTo)}&rdquo;
+            </p>
+          ) : (
+            <p className="text-sm text-mist">
+              Without this, reminders ask for the money but not a way to send it.
+            </p>
+          )}
+        </section>
 
         <section className="space-y-4">
           <h2 className="font-display text-[1.5rem]">Your cards</h2>

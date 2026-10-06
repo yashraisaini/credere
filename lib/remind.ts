@@ -2,33 +2,52 @@
 
 import { simplifyDebts } from "./balances";
 import { formatMoney } from "./money";
+import { payLine } from "./pay";
 import { displayName } from "./store";
-import type { Group } from "./types";
+import type { Group, PayTo } from "./types";
 
 /**
  * Nudging people, without a backend.
  *
- * There's no server to send from, so we hand the message to whatever the
- * phone already uses: an `sms:` link opens iMessage on iOS (green bubbles on
- * Android), and the Web Share sheet covers WhatsApp, Signal and the rest.
+ * There's no server to send from, so nothing here sends anything by itself.
+ * The message is handed to whatever the device already uses, with everything
+ * filled in, and the person taps send: `sms:` opens Messages, `mailto:` opens
+ * Mail, and the Web Share sheet covers WhatsApp, Signal and the rest.
  * Clipboard is the last resort on desktop browsers.
  */
 
-export type ReminderResult = "messages" | "shared" | "copied" | "cancelled" | "unavailable";
+export type ReminderResult =
+  | "messages"
+  | "email"
+  | "shared"
+  | "copied"
+  | "cancelled"
+  | "unavailable";
 
-/** One person, one amount. Friendly, short, no guilt. */
+export type Channel = "sms" | "email" | "share";
+
+/** One person, one amount. Friendly, short, no guilt, and a way to pay. */
 export function reminderText(opts: {
   name: string;
   amount: number;
   currency: string;
   groupName: string;
+  payTo?: PayTo;
 }): string {
-  const { name, amount, currency, groupName } = opts;
+  const { name, amount, currency, groupName, payTo } = opts;
   const first = name.split(/\s+/)[0];
-  return (
+  const ask =
     `Hey ${first}, it's ${formatMoney(amount, currency)} for ${groupName} whenever you get a chance. ` +
-    `No rush, just so it doesn't get lost.`
-  );
+    `No rush, just so it doesn't get lost.`;
+  const how = payLine(payTo);
+  return how ? `${ask}
+
+${how}` : ask;
+}
+
+/** Subject line for the email channel. */
+export function reminderSubject(groupName: string): string {
+  return `Settling up for ${groupName}`;
 }
 
 /** A whole-group rundown, for dropping in the group chat. */
@@ -51,18 +70,30 @@ export function groupSummaryText(group: Group, balances: Record<string, number>)
 }
 
 /**
- * Send it. A phone number goes straight to Messages; otherwise we open the
- * share sheet, and fall back to the clipboard.
+ * Hand it over. Opens Messages or Mail with everything already written; the
+ * person still taps send, because a web page cannot send on their behalf.
  */
-export async function sendReminder(text: string, phone?: string): Promise<ReminderResult> {
+export async function sendReminder(
+  text: string,
+  opts: { channel?: Channel; phone?: string; email?: string; subject?: string } = {},
+): Promise<ReminderResult> {
   if (typeof window === "undefined") return "unavailable";
+  const { channel = "share", phone, email, subject } = opts;
 
   // iOS wants `sms:number&body=`, Android wants `sms:number?body=`.
   // `?&body=` is the spelling both of them accept.
   const digits = phone?.replace(/[^\d+]/g, "");
-  if (digits) {
+  if (channel === "sms" && digits) {
     window.location.href = `sms:${digits}?&body=${encodeURIComponent(text)}`;
     return "messages";
+  }
+
+  if (channel === "email" && email?.trim()) {
+    const query = new URLSearchParams();
+    if (subject) query.set("subject", subject);
+    query.set("body", text);
+    window.location.href = `mailto:${encodeURIComponent(email.trim())}?${query.toString()}`;
+    return "email";
   }
 
   if (typeof navigator !== "undefined" && navigator.share) {
@@ -89,8 +120,9 @@ export function resultMessage(result: ReminderResult): string | null {
     case "copied":
       return "Copied, paste it wherever you like.";
     case "unavailable":
-      return "Couldn't open Messages on this device.";
+      return "Couldn't open Messages or Mail on this device.";
     case "messages":
+    case "email":
     case "shared":
     case "cancelled":
       return null;

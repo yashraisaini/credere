@@ -19,6 +19,9 @@ TypeScript, Tailwind v4, Zustand (localStorage for now).
   Store the URL, never a copy of the image: their terms want photos hotlinked, and base64 in
   localStorage would blow the quota. Always render `PhotoCredit` where a photo is shown, since
   crediting the photographer with a link back is a condition of their API.
+- Credere never moves money. `lib/pay.ts` holds labels and a handle that go into reminder text;
+  reminders open the device's own Messages or Mail prefilled and the user taps send. Nothing is
+  sent on their behalf, and no payment network is touched.
 - Run `npm run typecheck` after changes.
 
 ## Design

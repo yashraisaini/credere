@@ -7,11 +7,22 @@
 
 export type CurrencyCode = string; // ISO 4217, e.g. "CAD", "EUR", "JPY"
 
+/** How you want to be paid back. Goes into the reminders you send. */
+export type PayMethod = "etransfer" | "zelle" | "venmo" | "paypal" | "revolut" | "cash" | "other";
+
+export interface PayTo {
+  method: PayMethod;
+  /** The email or phone number people send to. */
+  handle: string;
+}
+
 export interface Profile {
   id: "me";
   name: string;
   homeCurrency: CurrencyCode;
   cardPlanId: string;
+  /** Optional. Without it, reminders ask for the money but not a way to send it. */
+  payTo?: PayTo;
 }
 
 export interface Member {
@@ -19,8 +30,9 @@ export interface Member {
   name: string;
   /** Card the member usually pays with. Drives foreign transaction fees. */
   cardPlanId: string;
-  /** Optional, for nudging them in Messages. Stays on this device. */
+  /** Optional, for nudging them. Both stay on this device. */
   phone?: string;
+  email?: string;
 }
 
 export type FeePolicy = "split" | "payer";

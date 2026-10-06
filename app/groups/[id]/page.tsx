@@ -23,7 +23,7 @@ import { GroupCover, PhotoCredit } from "@/components/GroupCover";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ActionSheet } from "@/components/ActionSheet";
 import { groupBalances, simplifyDebts } from "@/lib/balances";
-import { groupSummaryText, reminderText } from "@/lib/remind";
+import { groupSummaryText, reminderSubject, reminderText } from "@/lib/remind";
 import { PRESET_PLANS, describePlan, findPlan } from "@/lib/fees";
 import { formatMoney } from "@/lib/money";
 import { setPendingReceipt } from "@/lib/pending-receipt";
@@ -352,6 +352,7 @@ function ExpenseRow({
 
 function Balances({ group, balances }: { group: Group; balances: Record<string, number> }) {
   const addSettlement = useCredere((s) => s.addSettlement);
+  const payTo = useCredere((s) => s.profile.payTo);
   const transfers = simplifyDebts(balances);
   const base = group.baseCurrency;
 
@@ -394,11 +395,15 @@ function Balances({ group, balances }: { group: Group; balances: Record<string, 
                       {owesMe && debtor && (
                         <RemindButton
                           phone={debtor.phone}
+                          email={debtor.email}
+                          who={debtor.name}
+                          subject={reminderSubject(group.name)}
                           text={reminderText({
                             name: debtor.name,
                             amount: t.amount,
                             currency: base,
                             groupName: group.name,
+                            payTo,
                           })}
                         />
                       )}
@@ -430,8 +435,8 @@ function Balances({ group, balances }: { group: Group; balances: Record<string, 
                 text={groupSummaryText(group, balances)}
               />
               <p className="mt-2 text-xs text-mist">
-                Opens Messages with the rundown. Add a phone number under People to text someone
-                directly.
+                Opens your Messages or Mail with the rundown written. Add a phone or email under
+                People to reach someone directly.
               </p>
             </div>
           </>
@@ -478,7 +483,7 @@ function People({ group }: { group: Group }) {
                 </select>
               </div>
               {m.id !== "me" && (
-                <div className="mt-3 flex items-center gap-3 pl-[3.25rem]">
+                <div className="mt-3 space-y-2 pl-[3.25rem]">
                   <label className="sr-only" htmlFor={`phone-${m.id}`}>
                     Phone number for {m.name}
                   </label>
@@ -490,6 +495,19 @@ function People({ group }: { group: Group }) {
                     value={m.phone ?? ""}
                     onChange={(e) => updateMember(group.id, m.id, { phone: e.target.value })}
                     placeholder="Phone, to text a reminder"
+                    className={cx(inputBase, "h-10 w-full text-sm")}
+                  />
+                  <label className="sr-only" htmlFor={`email-${m.id}`}>
+                    Email for {m.name}
+                  </label>
+                  <input
+                    id={`email-${m.id}`}
+                    type="email"
+                    inputMode="email"
+                    autoComplete="off"
+                    value={m.email ?? ""}
+                    onChange={(e) => updateMember(group.id, m.id, { email: e.target.value })}
+                    placeholder="Email, to send a reminder"
                     className={cx(inputBase, "h-10 w-full text-sm")}
                   />
                 </div>
