@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Settings2 } from "lucide-react";
+import { Bell, Settings2 } from "lucide-react";
 import { useMemo } from "react";
 import { BalanceNote } from "@/components/BalanceNote";
 import { GroupCover } from "@/components/GroupCover";
@@ -9,6 +9,7 @@ import { useRipple } from "@/components/Ripple";
 import { AvatarStack, Money, Page, SectionTitle, cx } from "@/components/ui";
 import { groupBalances } from "@/lib/balances";
 import { convertMinor } from "@/lib/money";
+import { isUnread } from "@/lib/events";
 import { photoSrc, useGroupPhoto } from "@/lib/photo";
 import { useRates } from "@/lib/rates";
 import { displayName, useCredere } from "@/lib/store";
@@ -17,6 +18,7 @@ import type { Group } from "@/lib/types";
 export default function Home() {
   const { groups, expenses, settlements, profile } = useCredere();
   const home = profile.homeCurrency;
+  const unread = useCredere((s) => s.events.filter(isUnread).length);
 
   const yours = useMemo(
     () =>
@@ -63,13 +65,28 @@ export default function Home() {
     <Page>
       <header className="mb-7 flex items-center justify-between">
         <h1 className="font-display text-[2rem] font-normal tracking-[-0.01em]">Credere</h1>
-        <Link
-          href="/settings"
-          aria-label="Settings"
-          className="grid size-10 place-items-center rounded-full text-mist transition-colors hover:text-bone"
-        >
-          <Settings2 size={20} strokeWidth={1.5} />
-        </Link>
+        <div className="-mr-2 flex items-center">
+          <Link
+            href="/updates"
+            aria-label={unread ? `Updates, ${unread} new` : "Updates"}
+            className="relative grid size-10 place-items-center rounded-full text-mist transition-colors hover:text-bone"
+          >
+            <Bell size={20} strokeWidth={1.5} />
+            {unread > 0 && (
+              <span
+                aria-hidden
+                className="absolute right-2 top-2 size-2 rounded-full bg-sage shadow-[0_0_0_2px_var(--color-ink)]"
+              />
+            )}
+          </Link>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className="grid size-10 place-items-center rounded-full text-mist transition-colors hover:text-bone"
+          >
+            <Settings2 size={20} strokeWidth={1.5} />
+          </Link>
+        </div>
       </header>
 
       <BalanceNote

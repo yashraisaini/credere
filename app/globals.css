@@ -182,6 +182,19 @@
   backdrop-filter: blur(6px);
   animation: backdrop-in 260ms ease;
 }
+/* Same surface, docked to the bottom edge where a thumb can reach it */
+.sheet-bottom {
+  margin: auto auto 0;
+  width: min(30rem, 100vw);
+  border-radius: 22px 22px 0 0;
+  animation: sheet-up 280ms cubic-bezier(0.22, 0.7, 0.2, 1);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
 @keyframes sheet-in {
   from {
     opacity: 0;
@@ -217,6 +230,7 @@
     display: none;
   }
   .sheet,
+  .sheet-bottom,
   .sheet::backdrop {
     animation: none;
   }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Camera, Plus, Trash2 } from "lucide-react";
+import { Camera, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import {
   ActionBar,
@@ -21,6 +21,7 @@ import {
 import { RemindButton } from "@/components/Remind";
 import { GroupCover, PhotoCredit } from "@/components/GroupCover";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ActionSheet } from "@/components/ActionSheet";
 import { groupBalances, simplifyDebts } from "@/lib/balances";
 import { groupSummaryText, reminderText } from "@/lib/remind";
 import { PRESET_PLANS, describePlan, findPlan } from "@/lib/fees";
@@ -42,6 +43,10 @@ export default function GroupPage() {
   const [tab, setTab] = useState<Tab>("expenses");
   const fileRef = useRef<HTMLInputElement>(null);
   const photo = useGroupPhoto(group);
+  const setArchived = useCredere((s) => s.setArchived);
+  const deleteGroup = useCredere((s) => s.deleteGroup);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const expenses = useMemo(
     () =>
@@ -72,7 +77,17 @@ export default function GroupPage() {
 
   return (
     <Page>
-      <BackLink href="/">All groups</BackLink>
+      <div className="flex items-center justify-between gap-2">
+        <BackLink href="/">All groups</BackLink>
+        <button
+          type="button"
+          aria-label="Group options"
+          onClick={() => setMenuOpen(true)}
+          className="-mr-2 grid size-10 place-items-center rounded-full text-mist transition-colors hover:text-bone"
+        >
+          <MoreHorizontal size={20} strokeWidth={1.75} />
+        </button>
+      </div>
 
       <header className="mt-4">
         {/* Full bleed: the photo runs past the page gutter to the screen edges. */}
@@ -147,6 +162,48 @@ export default function GroupPage() {
           Add expense
         </Link>
       </ActionBar>
+
+      <ActionSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title={group.name}
+        subtitle={`${group.members.length} people · ${group.baseCurrency}`}
+        actions={[
+          {
+            label: group.archivedAt ? "Unarchive" : "Archive",
+            hint: group.archivedAt
+              ? "Move it back up with your active groups"
+              : "Tidy it to the bottom of the home screen, keeping everything",
+            onSelect: () => setArchived(group.id, !group.archivedAt),
+          },
+          {
+            label: "Delete group",
+            hint: "Removes its expenses and settlements too",
+            tone: "danger",
+            onSelect: () => setConfirmDelete(true),
+          },
+        ]}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          deleteGroup(group.id);
+          router.push("/");
+        }}
+        title={`Delete ${group.name}?`}
+        confirmLabel="Delete group"
+      >
+        <p>
+          {expenses.length === 0
+            ? "This group has no expenses recorded."
+            : `Its ${expenses.length} ${expenses.length === 1 ? "expense" : "expenses"} will be deleted too, along with any settlements, and will stop appearing in your activity.`}
+        </p>
+        <p className="mt-2">
+          This can&apos;t be undone. If you only want it out of the way, archive it instead.
+        </p>
+      </ConfirmDialog>
     </Page>
   );
 }
@@ -469,8 +526,6 @@ function People({ group }: { group: Group }) {
 
       <GroupPhotoSettings group={group} />
 
-      <GroupLifecycle group={group} />
-
       <section className="space-y-3">
         <h3 className="font-display text-[1.5rem]">Card fees</h3>
         <p className="text-sm text-mist">
@@ -490,63 +545,14 @@ function People({ group }: { group: Group }) {
   );
 }
 
-/**
- * Archiving and deleting. Archiving is reversible and lives one tap away;
- * deleting takes the group's expenses with it, so it asks first.
- */
-function GroupLifecycle({ group }: { group: Group }) {
-  const router = useRouter();
-  const setArchived = useCredere((s) => s.setArchived);
-  const deleteGroup = useCredere((s) => s.deleteGroup);
-  const expenseCount = useCredere((s) => s.expenses.filter((e) => e.groupId === group.id).length);
-  const [confirming, setConfirming] = useState(false);
-  const archived = Boolean(group.archivedAt);
-
-  return (
-    <section className="space-y-3">
-      <h3 className="font-display text-[1.5rem]">This group</h3>
-      <p className="text-sm text-mist">
-        {archived
-          ? "Archived groups sit at the bottom of the home screen and stay out of your headline balance."
-          : "Archiving tidies it away without losing anything. You can bring it back whenever."}
-      </p>
-
-      <div className="flex flex-wrap gap-3">
-        <Button type="button" variant="quiet" onClick={() => setArchived(group.id, !archived)}>
-          {archived ? "Unarchive" : "Archive"}
-        </Button>
-        <Button type="button" variant="quiet" onClick={() => setConfirming(true)}>
-          Delete
-        </Button>
-      </div>
-
-      <ConfirmDialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        onConfirm={() => {
-          deleteGroup(group.id);
-          router.push("/");
-        }}
-        title={`Delete ${group.name}?`}
-        confirmLabel="Delete group"
-      >
-        <p>
-          {expenseCount === 0
-            ? "This group has no expenses recorded."
-            : `Its ${expenseCount} ${expenseCount === 1 ? "expense" : "expenses"} will be deleted too, along with any settlements, and will stop appearing in your activity.`}
-        </p>
-        <p className="mt-2">
-          This can&apos;t be undone. If you only want it out of the way, archive it instead.
-        </p>
-      </ConfirmDialog>
-    </section>
-  );
-}
-
 /** Swap the cover photo for the next match, or drop back to the guilloche. */
 function GroupPhotoSettings({ group }: { group: Group }) {
   const setGroupPhoto = useCredere((s) => s.setGroupPhoto);
   const photo = useGroupPhoto(group);
+  const setArchived = useCredere((s) => s.setArchived);
+  const deleteGroup = useCredere((s) => s.deleteGroup);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [skip, setSkip] = useState(0);
   const [missed, setMissed] = useState(false);

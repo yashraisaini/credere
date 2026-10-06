@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { AppEvent, AppEventKind } from "./events";
 import { computeCardFee, findPlan } from "./fees";
 import { uid } from "./id";
 import { convertMinor } from "./money";
@@ -29,6 +30,8 @@ interface CredereState {
   expenses: Expense[];
   settlements: Settlement[];
   customPlans: CardPlan[];
+  /** What changed, newest first. Feeds the notification area. */
+  events: AppEvent[];
 
   updateProfile: (patch: Partial<Omit<Profile, "id">>) => void;
 
@@ -51,11 +54,40 @@ interface CredereState {
   deleteExpense: (id: string) => void;
 
   addSettlement: (s: Omit<Settlement, "id">) => void;
+  deleteSettlement: (id: string) => void;
+
+  markEventsRead: () => void;
 
   addCustomPlan: (plan: Omit<CardPlan, "id">) => string;
   removeCustomPlan: (id: string) => void;
 
   resetToDemo: () => void;
+}
+
+/**
+ * Build one log line. `actor` is always "me" while the store is local; the
+ * field is there so a server can drop other people's changes in untouched.
+ */
+function logged(
+  state: CredereState,
+  entry: {
+    kind: AppEventKind;
+    groupId?: string;
+    groupName: string;
+    subject: string;
+    amount?: { minor: number; currency: string };
+  },
+): AppEvent[] {
+  const event: AppEvent = {
+    ...entry,
+    id: uid("ev"),
+    at: new Date().toISOString(),
+    actor: "me",
+    actorName: state.profile.name,
+    readAt: null,
+  };
+  // Keep the log bounded; localStorage is not a database.
+  return [event, ...state.events].slice(0, 200);
 }
 
 export const useCredere = create<CredereState>()(
@@ -76,7 +108,10 @@ export const useCredere = create<CredereState>()(
           members: [me, ...members.map((m) => ({ ...m, id: uid("m") }))],
           createdAt: new Date().toISOString(),
         };
-        set((s) => ({ groups: [group, ...s.groups] }));
+        set((s) => ({
+          groups: [group, ...s.groups],
+          events: logged(s, { kind: "group-created", groupId: id, groupName: name, subject: name }),
+        }));
         return id;
       },
 
@@ -85,6 +120,12 @@ export const useCredere = create<CredereState>()(
           groups: s.groups.map((g) =>
             g.id === groupId ? { ...g, members: [...g.members, { ...member, id: uid("m") }] } : g,
           ),
+          events: logged(s, {
+            kind: "member-added",
+            groupId,
+            groupName: s.groups.find((g) => g.id === groupId)?.name ?? "a group",
+            subject: `${member.name} to ${s.groups.find((g) => g.id === groupId)?.name ?? "a group"}`,
+          }),
         })),
 
       updateMember: (groupId, memberId, patch) =>
@@ -111,29 +152,97 @@ export const useCredere = create<CredereState>()(
           groups: s.groups.map((g) =>
             g.id === groupId ? { ...g, archivedAt: archived ? new Date().toISOString() : null } : g,
           ),
+          events: logged(s, {
+            kind: archived ? "group-archived" : "group-unarchived",
+            groupId,
+            groupName: s.groups.find((g) => g.id === groupId)?.name ?? "a group",
+            subject: s.groups.find((g) => g.id === groupId)?.name ?? "a group",
+          }),
         })),
 
       // Expenses and settlements point at a group, so they go with it rather
       // than lingering as orphans the activity feed would still try to read.
       deleteGroup: (groupId) =>
-        set((s) => ({
-          groups: s.groups.filter((g) => g.id !== groupId),
-          expenses: s.expenses.filter((e) => e.groupId !== groupId),
-          settlements: s.settlements.filter((x) => x.groupId !== groupId),
-        })),
+        set((s) => {
+          const name = s.groups.find((g) => g.id === groupId)?.name ?? "a group";
+          return {
+            groups: s.groups.filter((g) => g.id !== groupId),
+            expenses: s.expenses.filter((e) => e.groupId !== groupId),
+            settlements: s.settlements.filter((x) => x.groupId !== groupId),
+            // No groupId: the group is gone, so nothing to link back to.
+            events: logged(s, { kind: "group-deleted", groupName: name, subject: name }),
+          };
+        }),
 
       addExpense: (expense) => {
         const id = uid("e");
         set((s) => ({
           expenses: [{ ...expense, id, createdAt: new Date().toISOString() }, ...s.expenses],
+          events: logged(s, {
+            kind: "expense-added",
+            groupId: expense.groupId,
+            groupName: s.groups.find((g) => g.id === expense.groupId)?.name ?? "a group",
+            subject: expense.description,
+            amount: { minor: expense.baseAmount + expense.fee.amount, currency: expense.original.currency },
+          }),
         }));
         return id;
       },
 
-      deleteExpense: (id) => set((s) => ({ expenses: s.expenses.filter((e) => e.id !== id) })),
+      deleteExpense: (id) =>
+        set((s) => {
+          const gone = s.expenses.find((e) => e.id === id);
+          return {
+            expenses: s.expenses.filter((e) => e.id !== id),
+            events: gone
+              ? logged(s, {
+                  kind: "expense-deleted",
+                  groupId: gone.groupId,
+                  groupName: s.groups.find((g) => g.id === gone.groupId)?.name ?? "a group",
+                  subject: gone.description,
+                })
+              : s.events,
+          };
+        }),
 
       addSettlement: (settlement) =>
-        set((s) => ({ settlements: [{ ...settlement, id: uid("s") }, ...s.settlements] })),
+        set((s) => {
+          const group = s.groups.find((g) => g.id === settlement.groupId);
+          return {
+            settlements: [{ ...settlement, id: uid("s") }, ...s.settlements],
+            events: logged(s, {
+              kind: "settlement-added",
+              groupId: settlement.groupId,
+              groupName: group?.name ?? "a group",
+              subject: `${displayName(group, settlement.from)} to ${displayName(group, settlement.to)}`,
+              amount: { minor: settlement.amount, currency: group?.baseCurrency ?? "" },
+            }),
+          };
+        }),
+
+      deleteSettlement: (id) =>
+        set((s) => {
+          const gone = s.settlements.find((x) => x.id === id);
+          const group = gone && s.groups.find((g) => g.id === gone.groupId);
+          return {
+            settlements: s.settlements.filter((x) => x.id !== id),
+            events: gone
+              ? logged(s, {
+                  kind: "settlement-deleted",
+                  groupId: gone.groupId,
+                  groupName: group?.name ?? "a group",
+                  subject: `${displayName(group || undefined, gone.from)} to ${displayName(group || undefined, gone.to)}`,
+                  amount: { minor: gone.amount, currency: group?.baseCurrency ?? "" },
+                })
+              : s.events,
+          };
+        }),
+
+      markEventsRead: () =>
+        set((s) => {
+          const at = new Date().toISOString();
+          return { events: s.events.map((e) => (e.readAt ? e : { ...e, readAt: at })) };
+        }),
 
       addCustomPlan: (plan) => {
         const id = uid("plan");
@@ -271,6 +380,7 @@ function demoData() {
     expenses,
     settlements: [] as Settlement[],
     customPlans: [] as CardPlan[],
+    events: [] as AppEvent[],
   };
 }
 
