@@ -6,10 +6,10 @@ import { useMemo } from "react";
 import { BalanceNote } from "@/components/BalanceNote";
 import { GroupCover } from "@/components/GroupCover";
 import { useRipple } from "@/components/Ripple";
-import { AvatarStack, Money, Page, SectionTitle } from "@/components/ui";
+import { AvatarStack, Money, Page, SectionTitle, cx } from "@/components/ui";
 import { groupBalances } from "@/lib/balances";
 import { convertMinor } from "@/lib/money";
-import { useGroupPhoto } from "@/lib/photo";
+import { photoSrc, useGroupPhoto } from "@/lib/photo";
 import { useRates } from "@/lib/rates";
 import { displayName, useCredere } from "@/lib/store";
 import type { Group } from "@/lib/types";
@@ -27,6 +27,15 @@ export default function Home() {
     [groups, expenses, settlements],
   );
 
+  const active = useMemo(() => yours.filter((y) => !y.group.archivedAt), [yours]);
+  const archived = useMemo(
+    () =>
+      yours
+        .filter((y) => y.group.archivedAt)
+        .sort((a, b) => (b.group.archivedAt ?? "").localeCompare(a.group.archivedAt ?? "")),
+    [yours],
+  );
+
   const pairs = useMemo(
     () =>
       Array.from(new Set(groups.map((g) => g.baseCurrency).filter((c) => c !== home))).map(
@@ -39,7 +48,7 @@ export default function Home() {
   let owed = 0;
   let owe = 0;
   let pending = false;
-  for (const { group, balance } of yours) {
+  for (const { group, balance } of active) {
     const rate = group.baseCurrency === home ? 1 : rates[`${group.baseCurrency}:${home}`];
     if (rate === undefined) {
       pending = true;
@@ -68,7 +77,7 @@ export default function Home() {
         owed={owed}
         owe={owe}
         currency={home}
-        groupCount={groups.length}
+        groupCount={active.length}
         pending={pending}
       />
 
@@ -83,7 +92,7 @@ export default function Home() {
           Groups
         </SectionTitle>
 
-        {groups.length === 0 ? (
+        {active.length === 0 && archived.length === 0 ? (
           <div className="mt-6 rounded-2xl p-6 shadow-[inset_0_0_0_1px_var(--color-rule)]">
             <p className="text-bone">Start a group for a trip, a house or a night out.</p>
             <Link href="/groups/new" className="mt-3 inline-block text-sm text-sage">
@@ -92,12 +101,29 @@ export default function Home() {
           </div>
         ) : (
           <ul className="mt-4 space-y-4">
-            {yours.map(({ group, balance }) => (
+            {active.map(({ group, balance }) => (
               <GroupCard key={group.id} group={group} balance={balance} />
             ))}
           </ul>
         )}
+
+        {active.length === 0 && archived.length > 0 && (
+          <p className="mt-6 text-sm text-mist">
+            Every group is archived. They're below, and unarchiving one brings it back up here.
+          </p>
+        )}
       </section>
+
+      {archived.length > 0 && (
+        <section className="mt-14">
+          <h2 className="text-sm text-mist">Archived</h2>
+          <ul className="mt-2">
+            {archived.map(({ group, balance }) => (
+              <ArchivedRow key={group.id} group={group} balance={balance} />
+            ))}
+          </ul>
+        </section>
+      )}
     </Page>
   );
 }
@@ -145,6 +171,39 @@ function GroupCard({ group, balance }: { group: Group; balance: number }) {
             </div>
           </div>
         </div>
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * An archived group: the same information, turned right down. A thumbnail
+ * rather than a photo card, so the live groups above keep the attention.
+ */
+function ArchivedRow({ group, balance }: { group: Group; balance: number }) {
+  const photo = useGroupPhoto(group);
+  return (
+    <li>
+      <Link
+        href={`/groups/${group.id}`}
+        className="flex items-center gap-3.5 border-b border-rule py-3.5 opacity-65 transition-opacity hover:opacity-100"
+      >
+        <span
+          className="size-10 shrink-0 overflow-hidden rounded-lg bg-vault shadow-[inset_0_0_0_1px_var(--color-rule)]"
+          style={photo ? { backgroundColor: photo.color } : undefined}
+        >
+          {photo && (
+            <img src={photoSrc(photo, 80)} alt="" loading="lazy" className="size-full object-cover" />
+          )}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[0.9375rem] text-bone">{group.name}</span>
+        <Money
+          minor={balance}
+          currency={group.baseCurrency}
+          signed
+          tone="balance"
+          className={cx("text-sm", balance === 0 && "text-mist")}
+        />
       </Link>
     </li>
   );

@@ -43,6 +43,9 @@ interface CredereState {
   setFeePolicy: (groupId: string, policy: FeePolicy) => void;
   /** Cover photo. Pass null to clear it and fall back to the guilloche. */
   setGroupPhoto: (groupId: string, photo: GroupPhoto | null) => void;
+  setArchived: (groupId: string, archived: boolean) => void;
+  /** Removes the group and everything recorded against it. Not undoable. */
+  deleteGroup: (groupId: string) => void;
 
   addExpense: (expense: Omit<Expense, "id" | "createdAt">) => string;
   deleteExpense: (id: string) => void;
@@ -101,6 +104,22 @@ export const useCredere = create<CredereState>()(
       setGroupPhoto: (groupId, photo) =>
         set((s) => ({
           groups: s.groups.map((g) => (g.id === groupId ? { ...g, photo } : g)),
+        })),
+
+      setArchived: (groupId, archived) =>
+        set((s) => ({
+          groups: s.groups.map((g) =>
+            g.id === groupId ? { ...g, archivedAt: archived ? new Date().toISOString() : null } : g,
+          ),
+        })),
+
+      // Expenses and settlements point at a group, so they go with it rather
+      // than lingering as orphans the activity feed would still try to read.
+      deleteGroup: (groupId) =>
+        set((s) => ({
+          groups: s.groups.filter((g) => g.id !== groupId),
+          expenses: s.expenses.filter((e) => e.groupId !== groupId),
+          settlements: s.settlements.filter((x) => x.groupId !== groupId),
         })),
 
       addExpense: (expense) => {

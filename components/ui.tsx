@@ -36,7 +36,7 @@ export function BackLink({ href, children }: { href: string; children: React.Rea
 }
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "quiet" | "ghost";
+  variant?: "primary" | "quiet" | "ghost" | "danger";
   block?: boolean;
 };
 
@@ -57,6 +57,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         variant === "primary" &&
           "bg-bottle text-bone shadow-[inset_0_0_0_1px_rgb(63_122_97/0.55)] hover:bg-bottle-hi",
         variant === "quiet" && "bg-transparent text-bone shadow-[inset_0_0_0_1px_var(--color-rule)] hover:shadow-[inset_0_0_0_1px_var(--color-engrave)]",
+        variant === "danger" && "bg-rose text-ink hover:bg-[#e3b0a3]",
         variant === "ghost" && "h-auto px-0 text-mist hover:text-bone",
         block && "w-full",
         className,

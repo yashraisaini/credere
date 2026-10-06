@@ -5,6 +5,7 @@ import { ArrowUpRight } from "lucide-react";
 import { Chip, Contactless } from "./Chip";
 import { Guilloche } from "./Guilloche";
 import { useRipple } from "./Ripple";
+import { Sheen, useTilt } from "./Tilt";
 import { formatMoney } from "@/lib/money";
 
 /**
@@ -28,13 +29,19 @@ export function BalanceNote({
 }) {
   const headline = net > 0 ? "You're owed" : net < 0 ? "You owe" : "You're all square";
   const { onPointerDown, layer } = useRipple<HTMLAnchorElement>();
+  const tilt = useTilt<HTMLAnchorElement>();
 
   return (
     <section aria-label="Your balance">
       <Link
         href="/activity"
-        onPointerDown={onPointerDown}
-        className="group relative block overflow-hidden rounded-[20px] bg-note p-[7px] shadow-[0_30px_60px_-30px_rgb(15_61_46/0.9)] transition-transform duration-200 active:scale-[0.993]"
+        ref={tilt.ref}
+        {...tilt.handlers}
+        onPointerDown={(e) => {
+          onPointerDown(e);
+          tilt.handlers.onPointerDown(e);
+        }}
+        className="tilt group relative block overflow-hidden rounded-[20px] bg-note p-[7px] shadow-[0_30px_60px_-30px_rgb(15_61_46/0.9)]"
       >
         {layer}
         <div className="relative min-h-[13.5rem] overflow-hidden rounded-[14px] px-6 pb-6 pt-7 shadow-[inset_0_0_0_1px_rgb(63_122_97/0.45)]">
@@ -76,6 +83,8 @@ export function BalanceNote({
               </span>
             </div>
           </div>
+
+          <Sheen />
         </div>
       </Link>
     </section>

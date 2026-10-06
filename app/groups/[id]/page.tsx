@@ -20,6 +20,7 @@ import {
 } from "@/components/ui";
 import { RemindButton } from "@/components/Remind";
 import { GroupCover, PhotoCredit } from "@/components/GroupCover";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { groupBalances, simplifyDebts } from "@/lib/balances";
 import { groupSummaryText, reminderText } from "@/lib/remind";
 import { PRESET_PLANS, describePlan, findPlan } from "@/lib/fees";
@@ -87,7 +88,14 @@ export default function GroupPage() {
             </h1>
           </div>
         </div>
-        <p className="mt-3 text-mist">{who}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="text-mist">{who}</p>
+          {group.archivedAt && (
+            <span className="rounded-full px-2 py-0.5 text-xs text-mist shadow-[inset_0_0_0_1px_var(--color-rule)]">
+              Archived
+            </span>
+          )}
+        </div>
         {lastForeign && <LiveRate from={lastForeign} to={group.baseCurrency} />}
       </header>
 
@@ -461,6 +469,8 @@ function People({ group }: { group: Group }) {
 
       <GroupPhotoSettings group={group} />
 
+      <GroupLifecycle group={group} />
+
       <section className="space-y-3">
         <h3 className="font-display text-[1.5rem]">Card fees</h3>
         <p className="text-sm text-mist">
@@ -477,6 +487,59 @@ function People({ group }: { group: Group }) {
         />
       </section>
     </div>
+  );
+}
+
+/**
+ * Archiving and deleting. Archiving is reversible and lives one tap away;
+ * deleting takes the group's expenses with it, so it asks first.
+ */
+function GroupLifecycle({ group }: { group: Group }) {
+  const router = useRouter();
+  const setArchived = useCredere((s) => s.setArchived);
+  const deleteGroup = useCredere((s) => s.deleteGroup);
+  const expenseCount = useCredere((s) => s.expenses.filter((e) => e.groupId === group.id).length);
+  const [confirming, setConfirming] = useState(false);
+  const archived = Boolean(group.archivedAt);
+
+  return (
+    <section className="space-y-3">
+      <h3 className="font-display text-[1.5rem]">This group</h3>
+      <p className="text-sm text-mist">
+        {archived
+          ? "Archived groups sit at the bottom of the home screen and stay out of your headline balance."
+          : "Archiving tidies it away without losing anything. You can bring it back whenever."}
+      </p>
+
+      <div className="flex flex-wrap gap-3">
+        <Button type="button" variant="quiet" onClick={() => setArchived(group.id, !archived)}>
+          {archived ? "Unarchive" : "Archive"}
+        </Button>
+        <Button type="button" variant="quiet" onClick={() => setConfirming(true)}>
+          Delete
+        </Button>
+      </div>
+
+      <ConfirmDialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={() => {
+          deleteGroup(group.id);
+          router.push("/");
+        }}
+        title={`Delete ${group.name}?`}
+        confirmLabel="Delete group"
+      >
+        <p>
+          {expenseCount === 0
+            ? "This group has no expenses recorded."
+            : `Its ${expenseCount} ${expenseCount === 1 ? "expense" : "expenses"} will be deleted too, along with any settlements, and will stop appearing in your activity.`}
+        </p>
+        <p className="mt-2">
+          This can&apos;t be undone. If you only want it out of the way, archive it instead.
+        </p>
+      </ConfirmDialog>
+    </section>
   );
 }
 

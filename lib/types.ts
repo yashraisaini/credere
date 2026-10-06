@@ -54,6 +54,8 @@ export interface Group {
   feePolicy: FeePolicy;
   /** Cover photo. Undefined means we haven't looked yet; null means the user cleared it. */
   photo?: GroupPhoto | null;
+  /** When it was archived. Archived groups drop out of the main list and the headline total. */
+  archivedAt?: string | null;
   createdAt: string;
 }
 
