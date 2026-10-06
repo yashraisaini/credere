@@ -138,8 +138,7 @@ export default function GroupPage() {
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
-        capture="environment"
+        accept="image/*,application/pdf,.heic,.heif"
         className="sr-only"
         tabIndex={-1}
         onChange={(e) => {

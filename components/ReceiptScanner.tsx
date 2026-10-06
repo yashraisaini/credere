@@ -1,15 +1,15 @@
 "use client";
 
-import { Camera, CircleAlert } from "lucide-react";
+import { Camera, CircleAlert, FileText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { prepareReceiptImage } from "@/lib/image";
+import { prepareReceipt } from "@/lib/image";
 import type { ScannedReceipt } from "@/lib/types";
 import { Button } from "./ui";
 
 type State =
   | { status: "idle" }
-  | { status: "reading"; preview: string }
-  | { status: "done"; preview: string; itemCount: number }
+  | { status: "reading"; preview: string | null }
+  | { status: "done"; preview: string | null; itemCount: number }
   | { status: "error"; message: string };
 
 /**
@@ -31,20 +31,24 @@ export function ReceiptScanner({
 
   async function scan(file: File) {
     try {
-      const img = await prepareReceiptImage(file);
-      setState({ status: "reading", preview: img.previewUrl });
+      const prepared = await prepareReceipt(file);
+      setState({ status: "reading", preview: prepared.previewUrl });
 
       const res = await fetch("/api/receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: img.base64, mediaType: img.mediaType, hintCurrency }),
+        body: JSON.stringify({
+          image: prepared.base64,
+          mediaType: prepared.mediaType,
+          hintCurrency,
+        }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Couldn't read that receipt.");
 
       const receipt = body as ScannedReceipt;
       onScanned(receipt);
-      setState({ status: "done", preview: img.previewUrl, itemCount: receipt.items.length });
+      setState({ status: "done", preview: prepared.previewUrl, itemCount: receipt.items.length });
     } catch (e) {
       setState({ status: "error", message: e instanceof Error ? e.message : "Couldn't read that receipt." });
     }
@@ -62,8 +66,7 @@ export function ReceiptScanner({
     <input
       ref={inputRef}
       type="file"
-      accept="image/*"
-      capture="environment"
+      accept="image/*,application/pdf,.heic,.heif"
       className="sr-only"
       tabIndex={-1}
       onChange={(e) => {
@@ -78,8 +81,15 @@ export function ReceiptScanner({
     return (
       <div className="flex items-center gap-4 rounded-2xl bg-vault p-3 shadow-[inset_0_0_0_1px_var(--color-rule)]">
         <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-ink">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={state.preview} alt="Your receipt" className="h-full w-full object-cover opacity-80" />
+          {state.preview ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={state.preview} alt="Your receipt" className="h-full w-full object-cover opacity-80" />
+          ) : (
+            // A PDF has no thumbnail to show, so stand in for the page itself.
+            <span className="grid h-full w-full place-items-center text-mist">
+              <FileText size={22} strokeWidth={1.5} aria-hidden />
+            </span>
+          )}
           {state.status === "reading" && (
             <span
               className="reading-line absolute inset-x-0 top-0 h-px bg-sage shadow-[0_0_12px_2px_rgb(181_210_192/0.6)]"
