@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { Bell, Settings2 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { BalanceNote } from "@/components/BalanceNote";
+import { RemindSheet } from "@/components/Remind";
 import { GroupCover } from "@/components/GroupCover";
 import { useRipple } from "@/components/Ripple";
 import { Avatar, AvatarStack, Money, Page, SectionTitle, cx } from "@/components/ui";
@@ -12,13 +13,17 @@ import { convertMinor } from "@/lib/money";
 import { isUnread } from "@/lib/events";
 import { photoSrc, useGroupPhoto } from "@/lib/photo";
 import { useRates } from "@/lib/rates";
+import { joinGroupNames, reminderSubject, reminderText } from "@/lib/remind";
 import { displayName, useCredere } from "@/lib/store";
 import type { Group } from "@/lib/types";
+import type { PersonBalance } from "@/lib/balances";
 
 export default function Home() {
   const { groups, expenses, settlements, profile } = useCredere();
   const home = profile.homeCurrency;
   const unread = useCredere((s) => s.events.filter(isUnread).length);
+  const payTo = useCredere((s) => s.profile.payTo);
+  const [remind, setRemind] = useState<PersonBalance | null>(null);
 
   const yours = useMemo(
     () =>
@@ -115,22 +120,62 @@ export default function Home() {
             {peoplePending ? "Who owes who, still converting…" : "Who owes who"}
           </h2>
           <ul className="mt-2">
-            {people.map((person) => (
-              <li key={person.name}>
-                <div className="flex items-center gap-3 border-b border-rule py-3">
+            {people.map((person) => {
+              const owesYou = person.net > 0;
+              const row = (
+                <>
                   <Avatar name={person.name} size={28} />
-                  <span className="min-w-0 flex-1 truncate text-[0.9375rem] text-bone">
-                    {person.net > 0 ? person.name : `You owe ${person.name}`}
+                  <span className="min-w-0 flex-1 truncate text-left text-[0.9375rem] text-bone">
+                    {owesYou ? person.name : `You owe ${person.name}`}
                   </span>
-                  <div className="shrink-0 text-right">
+                  <span className="shrink-0 text-right">
                     <Money minor={person.net} currency={home} signed tone="balance" className="text-sm" />
-                    <p className="text-xs text-mist">{person.net > 0 ? "owes you" : "you owe"}</p>
-                  </div>
-                </div>
-              </li>
-            ))}
+                    <span className="block text-xs text-mist">
+                      {owesYou ? "owes you" : "you owe"}
+                    </span>
+                  </span>
+                </>
+              );
+              return (
+                <li key={person.name}>
+                  {/* Only a debt owed to you is something to nudge about. */}
+                  {owesYou ? (
+                    <button
+                      type="button"
+                      onClick={() => setRemind(person)}
+                      className="flex w-full items-center gap-3 border-b border-rule py-3 transition-colors hover:border-engrave/50"
+                    >
+                      {row}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-3 border-b border-rule py-3">{row}</div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
+          <p className="mt-2 text-xs text-mist">
+            Tap someone to send a reminder.
+          </p>
         </section>
+      )}
+
+      {remind && (
+        <RemindSheet
+          open
+          onClose={() => setRemind(null)}
+          who={remind.name}
+          phone={remind.phone}
+          email={remind.email}
+          subject={reminderSubject(joinGroupNames(remind.groupNames))}
+          text={reminderText({
+            name: remind.name,
+            amount: remind.net,
+            currency: home,
+            groupName: joinGroupNames(remind.groupNames),
+            payTo,
+          })}
+        />
       )}
 
       <section className="mt-12">

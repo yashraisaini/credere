@@ -45,6 +45,12 @@ export function reminderText(opts: {
 ${how}` : ask;
 }
 
+/** "Lisbon", or "Lisbon and Apartment", for a debt that spans groups. */
+export function joinGroupNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "what we have going";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 /** Subject line for the email channel. */
 export function reminderSubject(groupName: string): string {
   return `Settling up for ${groupName}`;

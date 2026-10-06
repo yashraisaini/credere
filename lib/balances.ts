@@ -65,6 +65,11 @@ export interface PersonBalance {
   name: string;
   /** Positive: they owe you. Negative: you owe them. In the home currency. */
   net: number;
+  /** First one found across their groups, so a reminder has somewhere to go. */
+  phone?: string;
+  email?: string;
+  /** Every group they share with you, for wording the reminder. */
+  groupNames: string[];
 }
 
 /**
@@ -84,7 +89,7 @@ export function peopleBalances(
   settlements: Settlement[],
   convert: (minor: number, from: string) => number | undefined,
 ): { people: PersonBalance[]; pending: boolean } {
-  const byName = new Map<string, number>();
+  const byName = new Map<string, PersonBalance>();
   let pending = false;
 
   for (const group of groups) {
@@ -104,13 +109,20 @@ export function peopleBalances(
       }
 
       const otherId = youPay ? t.to : t.from;
-      const name = group.members.find((m) => m.id === otherId)?.name ?? "Someone";
-      byName.set(name, (byName.get(name) ?? 0) + (youPay ? -inHome : inHome));
+      const member = group.members.find((m) => m.id === otherId);
+      const name = member?.name ?? "Someone";
+
+      const sofar = byName.get(name) ?? { name, net: 0, groupNames: [] };
+      sofar.net += youPay ? -inHome : inHome;
+      // Keep the first contact details we see; a later group rarely knows better.
+      sofar.phone = sofar.phone || member?.phone?.trim() || undefined;
+      sofar.email = sofar.email || member?.email?.trim() || undefined;
+      if (!sofar.groupNames.includes(group.name)) sofar.groupNames.push(group.name);
+      byName.set(name, sofar);
     }
   }
 
-  const people = [...byName.entries()]
-    .map(([name, net]) => ({ name, net }))
+  const people = [...byName.values()]
     // Rounding across currencies can leave a stray cent that is not a real debt.
     .filter((p) => Math.abs(p.net) > 1)
     .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));

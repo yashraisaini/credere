@@ -14,6 +14,79 @@ import { resultMessage, sendReminder } from "@/lib/remind";
  * message already written, and the person taps send - a web page has no way to
  * send a text or an email on someone's behalf.
  */
+/**
+ * The routes a reminder can take, as an action sheet. Split out from the
+ * button so a list row can open it on tap without carrying a button of its own.
+ */
+export function RemindSheet({
+  open,
+  onClose,
+  text,
+  phone,
+  email,
+  subject,
+  who,
+}: {
+  open: boolean;
+  onClose: () => void;
+  text: string;
+  phone?: string;
+  email?: string;
+  subject?: string;
+  who?: string;
+}) {
+  const [note, setNote] = useState<string | null>(null);
+
+  return (
+    <>
+      <ActionSheet
+        open={open}
+        onClose={onClose}
+        title={who ? `Remind ${who}` : "Send the reminder"}
+        subtitle="Opens the app with the message written. You still tap send."
+        actions={buildActions({ text, phone, email, subject }, setNote)}
+      />
+      {note && (
+        <span role="status" className="mt-1.5 block text-xs text-mist">
+          {note}
+        </span>
+      )}
+    </>
+  );
+}
+
+/** Whichever routes this person actually has, in order of directness. */
+function buildActions(
+  opts: { text: string; phone?: string; email?: string; subject?: string },
+  setNote: (note: string | null) => void,
+): SheetAction[] {
+  const { text, phone, email, subject } = opts;
+
+  async function send(route: Parameters<typeof sendReminder>[1]) {
+    const result = await sendReminder(text, route);
+    setNote(resultMessage(result));
+    if (result === "copied") setTimeout(() => setNote(null), 2600);
+  }
+
+  const actions: SheetAction[] = [];
+  if (phone?.trim()) {
+    actions.push({ label: "Send as a text", hint: phone, onSelect: () => send({ channel: "sms", phone }) });
+  }
+  if (email?.trim()) {
+    actions.push({
+      label: "Send as an email",
+      hint: email,
+      onSelect: () => send({ channel: "email", email, subject }),
+    });
+  }
+  actions.push({
+    label: actions.length ? "Copy or share instead" : "Copy or share",
+    hint: actions.length ? undefined : "Add a phone or email under People to send it directly",
+    onSelect: () => send({ channel: "share" }),
+  });
+  return actions;
+}
+
 export function RemindButton({
   text,
   phone,
@@ -36,36 +109,7 @@ export function RemindButton({
 }) {
   const [note, setNote] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
-
-  async function send(opts: Parameters<typeof sendReminder>[1]) {
-    const result = await sendReminder(text, opts);
-    setNote(resultMessage(result));
-    if (result === "copied") setTimeout(() => setNote(null), 2600);
-  }
-
-  const hasPhone = Boolean(phone?.trim());
-  const hasEmail = Boolean(email?.trim());
-
-  const actions: SheetAction[] = [];
-  if (hasPhone) {
-    actions.push({
-      label: "Send as a text",
-      hint: phone,
-      onSelect: () => send({ channel: "sms", phone }),
-    });
-  }
-  if (hasEmail) {
-    actions.push({
-      label: "Send as an email",
-      hint: email,
-      onSelect: () => send({ channel: "email", email, subject }),
-    });
-  }
-  actions.push({
-    label: actions.length ? "Copy or share instead" : "Copy or share",
-    hint: actions.length ? undefined : "Add a phone or email to send it directly",
-    onSelect: () => send({ channel: "share" }),
-  });
+  const actions = buildActions({ text, phone, email, subject }, setNote);
 
   return (
     <span className={block ? "block" : "inline-flex flex-col items-end"}>
