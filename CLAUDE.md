@@ -22,6 +22,10 @@ TypeScript, Tailwind v4, Zustand (localStorage for now).
 - Credere never moves money. `lib/pay.ts` holds labels and a handle that go into reminder text;
   reminders open the device's own Messages or Mail prefilled and the user taps send. Nothing is
   sent on their behalf, and no payment network is touched.
+- `lib/card-catalog.ts` is reference data for the card-name autocomplete in Settings, not a source of
+  truth. Only the 0%-fee entries are a specific published claim; ordinary bank cards use the
+  generic 2.5% Visa/Mastercard assessment already used elsewhere. Keep it that way rather than
+  guessing at a particular bank's exact rate.
 - Run `npm run typecheck` after changes.
 
 ## Design

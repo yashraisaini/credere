@@ -2,11 +2,13 @@
 
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
+import { CardPicker } from "@/components/CardPicker";
 import { BackLink, Button, Field, Page, cx, inputClass, selectClass } from "@/components/ui";
 import { CURRENCIES } from "@/lib/currencies";
 import { PRESET_PLANS, describePlan } from "@/lib/fees";
 import { PAY_METHODS, payLine } from "@/lib/pay";
 import { useCredere } from "@/lib/store";
+import type { CardPlan } from "@/lib/types";
 
 export default function SettingsPage() {
   const { profile, updateProfile, customPlans, addCustomPlan, removeCustomPlan, resetToDemo } = useCredere();
@@ -15,6 +17,9 @@ export default function SettingsPage() {
   const [label, setLabel] = useState("");
   const [pct, setPct] = useState("");
   const [flat, setFlat] = useState("");
+  // Set when a catalog entry is picked, so a debit card saves as debit
+  // instead of being forced into "credit" like a typed-in name is.
+  const [kind, setKind] = useState<CardPlan["kind"]>("credit");
 
   const pctNum = Number(pct || 0);
   const flatNum = Number(flat || 0);
@@ -151,19 +156,33 @@ export default function SettingsPage() {
             onSubmit={(e) => {
               e.preventDefault();
               if (!valid) return;
-              addCustomPlan({ label: label.trim(), kind: "credit", fxFeePct: pctNum, fxFlatFee: flatNum });
+              addCustomPlan({ label: label.trim(), kind, fxFeePct: pctNum, fxFlatFee: flatNum });
               setLabel("");
               setPct("");
               setFlat("");
+              setKind("credit");
             }}
           >
-            <Field label="Card name" htmlFor="plan-label">
-              <input
+            <Field
+              label="Card name"
+              htmlFor="plan-label"
+              hint="Start typing to find your card and fill in its fee, or just type your own name and set the fee below."
+            >
+              <CardPicker
                 id="plan-label"
                 value={label}
-                onChange={(e) => setLabel(e.target.value)}
+                onChange={(v) => {
+                  setLabel(v);
+                  // Once they're typing past a pick, it's a name again, not a quote.
+                  setKind("credit");
+                }}
+                onPick={(entry) => {
+                  setLabel(entry.label);
+                  setPct(String(entry.fxFeePct));
+                  setFlat(String(entry.fxFlatFee));
+                  setKind(entry.kind);
+                }}
                 placeholder="e.g. TD Aeroplan Visa"
-                className={inputClass}
               />
             </Field>
             <div className="grid grid-cols-2 gap-3">
